@@ -1,0 +1,53 @@
+{
+  "name": "krishna-regulatory-systems-world",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests",
+    "test": "vitest",
+    "test:e2e": "playwright test --pass-with-no-tests"
+  },
+  "dependencies": {
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/three": "^0.186.0",
+    "@playwright/test": "^1.63.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.1",
+    "@typescript-eslint/parser": "^8.70.1",
+    "eslint": "^8.57.1",
+    "jsdom": "^27.1.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.1"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "browser": true,
+      "es2022": true,
+      "node": true
+    },
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": "latest",
+      "sourceType": "module"
+    },
+    "plugins": [
+      "@typescript-eslint"
+    ],
+    "extends": [
+      "eslint:recommended",
+      "plugin:@typescript-eslint/recommended"
+    ]
+  }
+}

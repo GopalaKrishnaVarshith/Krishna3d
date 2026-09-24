@@ -1,0 +1,31 @@
+:root {
+  color-scheme: dark;
+
+  --color-night-navy: #08131c;
+  --color-deep-teal: #0d3437;
+  --color-mineral-green: #477567;
+  --color-warm-brass: #c5a25a;
+  --color-soft-ivory: #f0eadb;
+  --color-daylight-sky: #9cc9df;
+  --color-focus: #ffcf69;
+  --color-readable-text: #f5f1e7;
+  --color-readable-muted: #bdc9c5;
+
+  --content-readable-width: 68ch;
+  --content-readable-wide: 78ch;
+
+  --motion-fast: 160ms;
+  --motion-standard: 280ms;
+  --motion-slow: 520ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --z-world: 0;
+  --z-ui: 10;
+  --z-overlay: 20;
+  --z-notice: 30;
+
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+}
