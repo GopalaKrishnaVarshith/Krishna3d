@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BoxGeometry, Mesh, MeshBasicMaterial, WebGLRenderer } from "three";
+import { BoxGeometry, Mesh, MeshBasicMaterial, Texture, TextureLoader, WebGLRenderer } from "three";
 import { Experience } from "../../src/core/Experience";
 
 function createExperience() {
@@ -53,6 +53,36 @@ describe("Experience", () => {
     expect(materialDispose).toHaveBeenCalledTimes(1);
     expect(container.contains(renderer.domElement)).toBe(false);
     expect(() => experience.start()).toThrow("disposed");
+  });
+
+  it("disposes a shared texture on single and array scene materials exactly once", () => {
+    const { experience } = createExperience();
+    const texture = new Texture(document.createElement("img"));
+    const textureDispose = vi.spyOn(texture, "dispose");
+    const first = new MeshBasicMaterial({ map: texture });
+    const second = new MeshBasicMaterial({ alphaMap: texture });
+    const third = new MeshBasicMaterial({ map: texture });
+    experience.scene.add(new Mesh(new BoxGeometry(), [first, second]));
+    experience.scene.add(new Mesh(new BoxGeometry(), third));
+
+    experience.dispose();
+    experience.dispose();
+
+    expect(textureDispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the asset manager dispose a loaded scene texture once", async () => {
+    const { experience } = createExperience();
+    const texture = new Texture(document.createElement("img"));
+    const textureDispose = vi.spyOn(texture, "dispose");
+    vi.spyOn(TextureLoader.prototype, "loadAsync").mockResolvedValue(texture);
+    const loaded = await experience.assets.loadTexture("/sample.webp");
+    experience.scene.add(new Mesh(new BoxGeometry(), new MeshBasicMaterial({ map: loaded })));
+
+    experience.dispose();
+    experience.dispose();
+
+    expect(textureDispose).toHaveBeenCalledTimes(1);
   });
 
   it("pauses on context loss and resumes after restoration", () => {

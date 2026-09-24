@@ -29,6 +29,10 @@ export class AssetManager {
     return request;
   }
 
+  owns(texture: Texture): boolean {
+    return this.loadedTextures.has(texture);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

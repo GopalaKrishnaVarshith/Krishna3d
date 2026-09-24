@@ -4,6 +4,7 @@ import {
   Material,
   PerspectiveCamera,
   Scene,
+  Texture,
   WebGLRenderer,
 } from "three";
 import { AssetManager } from "./AssetManager";
@@ -58,6 +59,7 @@ export class Experience {
 
     const geometries = new Set<BufferGeometry>();
     const materials = new Set<Material>();
+    const materialTextures = new Set<Texture>();
     this.scene.traverse((object) => {
       const drawable = object as typeof object & {
         geometry?: BufferGeometry;
@@ -72,7 +74,13 @@ export class Experience {
       }
     });
     for (const geometry of geometries) geometry.dispose();
-    for (const material of materials) material.dispose();
+    for (const material of materials) {
+      for (const value of Object.values(material)) {
+        if (value instanceof Texture && !this.assets.owns(value)) materialTextures.add(value);
+      }
+      material.dispose();
+    }
+    for (const texture of materialTextures) texture.dispose();
     this.scene.clear();
     this.assets.dispose();
     this.events.clear();
