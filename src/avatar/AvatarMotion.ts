@@ -27,8 +27,7 @@ export const AVATAR_MOTION = {
 } as const;
 
 export class AvatarMotion {
-  private velocityX = 0;
-  private velocityZ = 0;
+  private speed = 0;
   private yaw = 0;
   private phase = 0;
   private elapsed = 0;
@@ -47,33 +46,28 @@ export class AvatarMotion {
     const inputLength = Math.min(rawLength, 1);
     const normalizedX = rawLength > 0 ? moveX / rawLength : 0;
     const normalizedZ = rawLength > 0 ? moveZ / rawLength : 0;
-    const desiredX = normalizedX * inputLength * AVATAR_MOTION.maxSpeed;
-    const desiredZ = normalizedZ * inputLength * AVATAR_MOTION.maxSpeed;
-    const differenceX = desiredX - this.velocityX;
-    const differenceZ = desiredZ - this.velocityZ;
-    const differenceLength = Math.hypot(differenceX, differenceZ);
-    const rate = inputLength > 0 ? AVATAR_MOTION.acceleration : AVATAR_MOTION.deceleration;
-    const velocityStep = Math.min(differenceLength, rate * dt);
-
-    if (differenceLength > 0) {
-      this.velocityX += (differenceX / differenceLength) * velocityStep;
-      this.velocityZ += (differenceZ / differenceLength) * velocityStep;
-    }
-    if (Math.hypot(this.velocityX, this.velocityZ) < 1e-5) {
-      this.velocityX = 0;
-      this.velocityZ = 0;
-    }
-
     let turnRate = 0;
+    let remainingAngle = 0;
     if (inputLength > 0 && dt > 0) {
       const targetYaw = Math.atan2(normalizedX, normalizedZ);
       const difference = Math.atan2(Math.sin(targetYaw - this.yaw), Math.cos(targetYaw - this.yaw));
       const change = Math.max(-AVATAR_MOTION.maxTurnRate * dt, Math.min(AVATAR_MOTION.maxTurnRate * dt, difference));
       this.yaw += change;
       turnRate = change / dt;
+      remainingAngle = Math.atan2(Math.sin(targetYaw - this.yaw), Math.cos(targetYaw - this.yaw));
     }
 
-    const speed = Math.hypot(this.velocityX, this.velocityZ);
+    // A hard turn slows the walk while the body rotates. Translation always follows
+    // the visible facing axis, so the gait never slides sideways or backward.
+    const alignment = Math.max(0, Math.cos(remainingAngle));
+    const desiredSpeed = AVATAR_MOTION.maxSpeed * inputLength * alignment;
+    const rate = desiredSpeed > this.speed ? AVATAR_MOTION.acceleration : AVATAR_MOTION.deceleration;
+    const change = Math.max(-rate * dt, Math.min(rate * dt, desiredSpeed - this.speed));
+    this.speed += change;
+    if (this.speed < 1e-5) this.speed = 0;
+    const speed = this.speed;
+    const velocityX = Math.sin(this.yaw) * speed;
+    const velocityZ = Math.cos(this.yaw) * speed;
     const isMoving = speed > 0.001;
     const intensity = Math.min(speed / AVATAR_MOTION.maxSpeed, 1);
     if (isMoving) this.phase += speed * dt * 5.6;
@@ -85,8 +79,8 @@ export class AvatarMotion {
       speed,
       turnRate,
       isMoving,
-      velocityX: this.velocityX,
-      velocityZ: this.velocityZ,
+      velocityX,
+      velocityZ,
       yaw: this.yaw,
       walkPhase: this.phase,
       stride: isMoving ? Math.sin(this.phase) * intensity * (this.reducedMotion ? 0.18 : 1) : 0,

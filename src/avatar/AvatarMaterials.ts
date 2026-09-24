@@ -1,6 +1,5 @@
 import {
-  ClampToEdgeWrapping,
-  DataTexture,
+  CanvasTexture,
   DoubleSide,
   LinearFilter,
   MeshPhysicalMaterial,
@@ -27,38 +26,53 @@ export interface AvatarMaterials {
 /** A small, per-avatar palette reused by every part of its mesh hierarchy. */
 export function createAvatarMaterials(portrait: Texture): AvatarMaterials {
   portrait.colorSpace = SRGBColorSpace;
-  const size = 64;
-  const mask = new Uint8Array(size * size * 4);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const u = (x + 0.5) / size;
-      const v = (y + 0.5) / size;
-      const feather = Math.min(
-        (u - 0.282) / 0.026, (0.718 - u) / 0.026,
-        (v - 0.41) / 0.026, (0.765 - v) / 0.026,
-      );
-      const value = Math.round(Math.max(0, Math.min(1, feather)) * 255);
-      const offset = (y * size + x) * 4;
-      mask[offset] = 255;
-      mask[offset + 1] = value;
-      mask[offset + 2] = 255;
-      mask[offset + 3] = 255;
-    }
-  }
-  const faceMask = new DataTexture(mask, size, size);
-  faceMask.magFilter = LinearFilter;
-  faceMask.minFilter = LinearFilter;
-  faceMask.wrapS = ClampToEdgeWrapping;
-  faceMask.wrapT = ClampToEdgeWrapping;
-  faceMask.needsUpdate = true;
+  const size = 1024;
+  const atlas = document.createElement("canvas");
+  atlas.width = atlas.height = size;
+  const layer = document.createElement("canvas");
+  layer.width = layer.height = size;
+  const context = atlas.getContext("2d");
+  const layerContext = layer.getContext("2d");
+  if (!context || !layerContext) throw new Error("The avatar face requires a 2D canvas context");
+  context.fillStyle = "#b98469";
+  context.fillRect(0, 0, size, size);
+
+  const image = portrait.image as CanvasImageSource & { width: number; height: number };
+  const dx = size * 0.32;
+  const dy = size * 0.18;
+  const dw = size * 0.36;
+  const dh = size * 0.78;
+  layerContext.drawImage(image, image.width * 0.27, image.height * 0.205,
+    image.width * 0.46, image.height * 0.42, dx, dy, dw, dh);
+  layerContext.globalCompositeOperation = "destination-in";
+  const horizontal = layerContext.createLinearGradient(dx, 0, dx + dw, 0);
+  horizontal.addColorStop(0, "rgba(255,255,255,0)");
+  horizontal.addColorStop(0.14, "white");
+  horizontal.addColorStop(0.86, "white");
+  horizontal.addColorStop(1, "rgba(255,255,255,0)");
+  layerContext.fillStyle = horizontal;
+  layerContext.fillRect(dx, dy, dw, dh);
+  const vertical = layerContext.createLinearGradient(0, dy, 0, dy + dh);
+  vertical.addColorStop(0, "rgba(255,255,255,0)");
+  vertical.addColorStop(0.07, "white");
+  vertical.addColorStop(0.93, "white");
+  vertical.addColorStop(1, "rgba(255,255,255,0)");
+  layerContext.fillStyle = vertical;
+  layerContext.fillRect(dx, dy, dw, dh);
+  context.drawImage(layer, 0, 0);
+  const faceAtlas = new CanvasTexture(atlas);
+  faceAtlas.colorSpace = SRGBColorSpace;
+  faceAtlas.minFilter = LinearFilter;
+  faceAtlas.magFilter = LinearFilter;
+  faceAtlas.generateMipmaps = false;
   return {
     wool: new MeshStandardMaterial({ color: 0x20335d, roughness: 0.86, flatShading: true }),
     lapel: new MeshStandardMaterial({ color: 0x2a416e, roughness: 0.83, flatShading: true, side: DoubleSide }),
     cotton: new MeshStandardMaterial({ color: 0xf2f0ed, roughness: 0.94, side: DoubleSide }),
-    skin: new MeshStandardMaterial({ color: 0xbd8167, roughness: 0.92, flatShading: true }),
+    skin: new MeshStandardMaterial({ color: 0xb98469, roughness: 0.94 }),
     hair: new MeshStandardMaterial({ color: 0x211c20, roughness: 0.96, flatShading: true }),
     hairLight: new MeshStandardMaterial({ color: 0x392b2d, roughness: 0.98, flatShading: true }),
-    beard: new MeshStandardMaterial({ color: 0x261d1c, roughness: 1, flatShading: true }),
+    beard: new MeshStandardMaterial({ color: 0x382b26, roughness: 1, flatShading: true, side: DoubleSide }),
     leather: new MeshStandardMaterial({ color: 0x593a2b, roughness: 0.46, metalness: 0.04, flatShading: true }),
     sole: new MeshStandardMaterial({ color: 0x251e1d, roughness: 0.88, flatShading: true }),
     gold: new MeshStandardMaterial({ color: 0xc9a675, roughness: 0.3, metalness: 0.82 }),
@@ -67,11 +81,10 @@ export function createAvatarMaterials(portrait: Texture): AvatarMaterials {
       roughness: 0.08,
       metalness: 0,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.035,
       depthWrite: false,
       side: DoubleSide,
     }),
-    face: new MeshStandardMaterial({ map: portrait, alphaMap: faceMask, transparent: true, depthWrite: false,
-      roughness: 0.98, side: DoubleSide }),
+    face: new MeshStandardMaterial({ map: faceAtlas, roughness: 0.98, side: DoubleSide }),
   };
 }

@@ -56,6 +56,28 @@ describe("AvatarMotion", () => {
     expect(Math.abs(reversed.turnRate)).toBeLessThanOrEqual(AVATAR_MOTION.maxTurnRate + 1e-6);
   });
 
+  it("keeps travel aligned with facing through a right-angle turn and reversal", () => {
+    const motion = new AvatarMotion();
+    for (let frame = 0; frame < 90; frame += 1) motion.update({ ...idle, moveZ: 1 }, 1 / 60);
+    let pose = motion.update({ ...idle, moveX: 1 }, 1 / 60);
+    expect(pose.speed).toBeLessThan(AVATAR_MOTION.maxSpeed);
+    for (let frame = 0; frame < 90; frame += 1) {
+      const forward = pose.velocityX * Math.sin(pose.yaw) + pose.velocityZ * Math.cos(pose.yaw);
+      const lateral = pose.velocityX * Math.cos(pose.yaw) - pose.velocityZ * Math.sin(pose.yaw);
+      expect(forward).toBeGreaterThanOrEqual(-1e-6);
+      expect(Math.abs(lateral)).toBeLessThan(1e-5);
+      pose = motion.update({ ...idle, moveX: 1 }, 1 / 60);
+    }
+    pose = motion.update({ ...idle, moveX: -1 }, 1 / 60);
+    for (let frame = 0; frame < 120; frame += 1) {
+      const forward = pose.velocityX * Math.sin(pose.yaw) + pose.velocityZ * Math.cos(pose.yaw);
+      const lateral = pose.velocityX * Math.cos(pose.yaw) - pose.velocityZ * Math.sin(pose.yaw);
+      expect(forward).toBeGreaterThanOrEqual(-1e-6);
+      expect(Math.abs(lateral)).toBeLessThan(1e-5);
+      pose = motion.update({ ...idle, moveX: -1 }, 1 / 60);
+    }
+  });
+
   it("suppresses idle breathing and bounce when reduced motion is enabled", () => {
     const motion = new AvatarMotion();
     let pose = motion.update(idle, 0.33);

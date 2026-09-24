@@ -4,7 +4,7 @@ These images are concept references for a procedurally modeled Three.js world. T
 
 | Area | Concept evidence | Implementation evidence | Status |
 |---|---|---|---|
-| Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Task 5 four-view browser captures listed below | Standalone visual gate reviewed; final world integration follows Task 7 |
+| Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Revised Task 5 four-view and motion captures listed below | Revised visual gate submitted for independent review |
 | Arrival night | `concepts/arrival-night.png` | Added during Task 7 | Awaiting Task 7 review |
 | Arrival day | `concepts/arrival-day.png` | Added during Task 7 | Awaiting Task 7 review |
 | World topology | `concepts/world-map.png` | Added during Task 7 | Awaiting Task 7 review |
@@ -31,10 +31,10 @@ The five PNG files are production design references. Do not ship these full-reso
 
 - **Identity:** use the supplied portrait as the facial source. Preserve the complete upward and sideward dark wavy hair volume, medium-brown skin, thin gold round/rimless glasses, thick eyebrows, moustache, full beard and softly rectangular face. Never trim or crop the crown to fit the camera.
 - **Body:** tailored navy suit with visible lapels, white open-collar shirt, dark trousers, brown belt, polished brown shoes, and relaxed hands. Retain a single character proportion set across front, three-quarter, side and back.
-- **Procedural build:** custom rounded head, layered tapered hair clumps, separate eyebrows/beard/moustache masses, thin tubular glasses, beveled jacket and lapels, pivoted limbs, simple hands and shoes. Use the portrait-derived face texture only where it improves identity. The turnaround is an anatomy and clothing reference; its smooth render should be translated to a visibly stylized mesh budget.
+- **Procedural build:** one shaped portrait-mapped head with a nose profile and continuous skin cheeks/jaw, conforming side beard, photographed brows/moustache/rimless lenses, thin modeled gold temples, a sculpted hairline with directional instanced clumps, lofted jacket and sleeves, pivoted limbs, tapered trousers and low shoes. The turnaround is an anatomy and clothing reference; its smooth render is translated to a visibly stylized mesh budget.
 - **Camera check:** at normal follow distance, hair, glasses, beard, navy jacket and white shirt must each remain recognizable. Check front and side before approving the model.
 
-### Task 5 visual gate (2026-09-24)
+### Initial Task 5 visual gate (superseded after review)
 
 The browser renders below use `src/avatar/Avatar.ts` with the optimized portrait texture. They were compared by direct image inspection with both the source portrait and `concepts/avatar-turnaround.png`. The four captures are retained beside the Task 5 report as review evidence, outside the shipped bundle.
 
@@ -45,7 +45,24 @@ The browser renders below use `src/avatar/Avatar.ts` with the optimized portrait
 | Side | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-side.png` (1100 × 900) | Full hair volume, ear, nose, glasses bridge/temple, beard profile, jacket depth and shoe outline remain legible. |
 | World-scale proxy | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-world.png` (1600 × 900) | At a follow-distance camera on a temporary ringed-plaza proxy, hair, glasses, facial hair, navy suit and white shirt remain recognizable. This checks avatar scale only; Task 7 owns the actual plaza and lighting integration. |
 
-The first capture exposed a dark triangle through the shirt, an oversized hair mass and an offset facial surface. The final captures above follow geometry and placement corrections to those features and a second refinement of the beard/jaw silhouette. The retained style is a controlled faceted mesh with a portrait-derived curved face. It intentionally has less tailoring and hair detail than the smooth concept turnaround.
+The first capture exposed a dark triangle through the shirt, an oversized hair mass and an offset facial surface. Early corrections did not fully resolve the separate-face look, hairstyle, tailoring or motion evidence. The initial review rejected this gate.
+
+The initial gate failed independent review for face integration, hair and tailoring quality, and direction-change sliding. Its captures are retained only as before-state evidence; the acceptance claim above is superseded by the revised gate below.
+
+### Task 5 revised visual gate (2026-09-24)
+
+The captures below render the revised `src/avatar/Avatar.ts` at the **same camera positions and image sizes** using `public/assets/portrait/krishna-portrait.webp`. They were inspected directly with `view_image` beside the supplied source portrait and `concepts/avatar-turnaround.png`. All QA captures are retained beside the Task 5 report and excluded from the shipped bundle.
+
+| View | Revised evidence | Direct inspection |
+|---|---|---|
+| Front | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-fixed-front.png` (1100 × 900) | One textured head surface carries the brows, rimless gold glasses, nose, moustache, lips and beard without doubled front overlays. Full crown and shoes fit the frame; the smaller head sits in a narrower navy lapel and white open-collar silhouette. |
+| Three-quarter | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-fixed-threequarter.png` (1100 × 900) | Portrait color feathers into the modeled cheek and jaw on the same mesh. The thin glasses temple, jaw beard, directional hair sweep, sloped shoulder and jacket depth are visible. |
+| Side | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-fixed-side.png` (1100 × 900) | Continuous head and nose profile replaces the protruding dot nose and separate face patch. Hairline exposes the temple, the beard hugs the lower cheek/jaw, and the tapered sleeves and low brown shoe profile remain legible. |
+| World-scale proxy | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-fixed-world.png` (1600 × 900) | At the same follow-distance camera, the full head, glasses, facial hair, navy suit, white shirt and brown shoes remain visible. This is a scale proxy on a ringed platform, not Task 7's actual plaza. |
+
+Motion was rendered at a fixed follow-distance framing in `task-5-motion-walk.png`, `task-5-motion-turn-start.png`, `task-5-motion-turn-end.png`, `task-5-motion-interact.png`, `task-5-motion-reduced-idle-a.png`, `task-5-motion-reduced-idle-b.png`, and `task-5-motion-reduced-walk.png` in the same evidence directory. The walk and turn images show a gait on the facing axis; interaction raises one arm toward a console-height target. The two reduced-motion idle images are byte-identical while reduced-motion walking still advances with a smaller stride. A unit test now verifies zero lateral or backward velocity relative to capped yaw through 90-degree and reversal inputs.
+
+The portrait is frontal, so side texture detail naturally diminishes. The continuous skin-toned head, shaped nose, ear, jaw beard and thin spectacle temple provide the side silhouette. The intentionally faceted suit and hair retain less image-level detail than the smooth turnaround; this is the specified procedural low-poly translation. Independent visual acceptance of the revised captures remains the next gate.
 
 ## Theme pairing
 
