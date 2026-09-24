@@ -4,7 +4,7 @@ These images are concept references for a procedurally modeled Three.js world. T
 
 | Area | Concept evidence | Implementation evidence | Status |
 |---|---|---|---|
-| Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Revised Task 5 four-view and motion captures listed below | Revised visual gate submitted for independent review |
+| Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Task 5 round 2 four-view and motion captures listed below | Round 2 visual gate submitted for independent review |
 | Arrival night | `concepts/arrival-night.png` | Added during Task 7 | Awaiting Task 7 review |
 | Arrival day | `concepts/arrival-day.png` | Added during Task 7 | Awaiting Task 7 review |
 | World topology | `concepts/world-map.png` | Added during Task 7 | Awaiting Task 7 review |
@@ -29,9 +29,9 @@ The five PNG files are production design references. Do not ship these full-reso
 
 ## Avatar construction inventory
 
-- **Identity:** use the supplied portrait as the facial source. Preserve the complete upward and sideward dark wavy hair volume, medium-brown skin, thin gold round/rimless glasses, thick eyebrows, moustache, full beard and softly rectangular face. Never trim or crop the crown to fit the camera.
+- **Identity:** use the supplied portrait for likeness, medium-brown complexion, dark wavy hair, thin gold glasses, thick eyebrows, moustache, full beard and softly rectangular face. The face can be sculpted instead of displaying a photographic patch. Never trim or crop the crown to fit the camera.
 - **Body:** tailored navy suit with visible lapels, white open-collar shirt, dark trousers, brown belt, polished brown shoes, and relaxed hands. Retain a single character proportion set across front, three-quarter, side and back.
-- **Procedural build:** one shaped portrait-mapped head with a nose profile and continuous skin cheeks/jaw, conforming side beard, photographed brows/moustache/rimless lenses, thin modeled gold temples, a sculpted hairline with directional instanced clumps, lofted jacket and sleeves, pivoted limbs, tapered trousers and low shoes. The turnaround is an anatomy and clothing reference; its smooth render is translated to a visibly stylized mesh budget.
+- **Procedural build:** one sculpted head with continuous skin cheeks/jaw, modeled eyes, brows, nose ridge, smile, beard and moustache, thin gold eyewear, a single asymmetric hair mass with procedural flow texture, a wraparound tailored jacket over a curved white shirt front, pivoted tapered limbs and brown Oxford shoes. The portrait supplies palette and anatomy cues; the turnaround supplies the full-body silhouette. Both are translated to a visibly stylized mesh budget.
 - **Camera check:** at normal follow distance, hair, glasses, beard, navy jacket and white shirt must each remain recognizable. Check front and side before approving the model.
 
 ### Initial Task 5 visual gate (superseded after review)
@@ -63,6 +63,23 @@ The captures below render the revised `src/avatar/Avatar.ts` at the **same camer
 Motion was rendered at a fixed follow-distance framing in `task-5-motion-walk.png`, `task-5-motion-turn-start.png`, `task-5-motion-turn-end.png`, `task-5-motion-interact.png`, `task-5-motion-reduced-idle-a.png`, `task-5-motion-reduced-idle-b.png`, and `task-5-motion-reduced-walk.png` in the same evidence directory. The walk and turn images show a gait on the facing axis; interaction raises one arm toward a console-height target. The two reduced-motion idle images are byte-identical while reduced-motion walking still advances with a smaller stride. A unit test now verifies zero lateral or backward velocity relative to capped yaw through 90-degree and reversal inputs.
 
 The portrait is frontal, so side texture detail naturally diminishes. The continuous skin-toned head, shaped nose, ear, jaw beard and thin spectacle temple provide the side silhouette. The intentionally faceted suit and hair retain less image-level detail than the smooth turnaround; this is the specified procedural low-poly translation. Independent visual acceptance of the revised captures remains the next gate.
+
+The independent round 1 re-review rejected the four static `task-5-fixed-*.png` images above for a still-visible photo/mesh boundary, knobby hair and schematic body. The motion and heading-alignment evidence passed. Those static images remain before-state evidence only.
+
+### Task 5 round 2 visual gate (submitted for review)
+
+The round 2 model removes the portrait decal entirely. The portrait is sampled only for complexion; face shape, eyes, brows, nose, smile, moustache, beard, glasses and hair are all modeled. Hair flow comes from one continuous, asymmetrically swept mesh with a small procedural strand texture. The shirt is a curved insert within a wraparound jacket; the hem overlaps the trousers. Legs, sleeves, hands and shoes were re-proportioned and visually inspected at front, three-quarter, side and follow distance against the portrait and approved turnaround.
+
+| View | Round 2 browser capture | Direct inspection |
+|---|---|---|
+| Front | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-round2-front.png` (1100 × 900) | Complete dark swept crown and shoes, modeled face with thin gold glasses and continuous beard, navy jacket framing an open white shirt, longer trouser proportions and narrow sleeves. |
+| Three-quarter | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-round2-threequarter.png` (1100 × 900) | Facial volumes and beard wrap are continuous with the side of the head; the jacket/lapel has depth, hands hang below the hem and rounded shoe toe/sole/heel are distinct. |
+| Side | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-round2-side.png` (1100 × 900) | Full crown, nose/cheek/jaw profile, ear and gold spectacle temple are present; beard tapers behind the jaw and the jacket hem overlaps the upper trousers. Side camera was moved back slightly to include the taller full-body proportion. |
+| World-scale proxy | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-round2-world.png` (1600 × 900) | Hair, glasses, beard, suit, white shirt and brown shoes remain distinguishable at follow distance on the neutral ringed-platform proxy. |
+
+Additional close QA images (`task-5-round2-head.png`, `task-5-round2-headthreequarter.png`, `task-5-round2-headside.png`) were used to check face, hairline, beard, eyewear and neckline alignment. The final rig was also rendered in `task-5-round2-motion-walk.png`, `task-5-round2-motion-turn.png`, `task-5-round2-motion-interact.png` and `task-5-round2-motion-reduced-idle.png`; floor contact and elbow continuity were inspected after changing leg length. The turn/sliding logic and its unit test remain the independently accepted round 1 implementation.
+
+Round 2 is a deliberate low-poly interpretation and remains less detailed than the smooth turnaround. These images establish a new review candidate, not independent acceptance or final world lighting proof.
 
 ## Theme pairing
 
