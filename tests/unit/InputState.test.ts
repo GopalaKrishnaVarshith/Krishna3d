@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InputState } from "../../src/controls/InputState";
+import { InputState, ORBIT_RADIANS_PER_PIXEL } from "../../src/controls/InputState";
 
 describe("InputState", () => {
   it("combines simultaneous keys and normalizes diagonal movement", () => {
@@ -19,10 +19,24 @@ describe("InputState", () => {
     const input = new InputState();
     input.pointerDown(1, 30, 40);
     input.pointerMove(1, 50, 60);
-    expect(input.consumeFrame().orbitX).toBe(20);
+    expect(input.consumeFrame().orbitX).toBeCloseTo(20 * ORBIT_RADIANS_PER_PIXEL);
     input.pointerUp(1);
     input.pointerMove(1, 70, 80);
     expect(input.consumeFrame().orbitX).toBe(0);
+  });
+
+  it("converts one-pixel drags in both directions to small angular intent", () => {
+    const input = new InputState();
+    input.pointerDown(1, 100, 100);
+    input.pointerMove(1, 101, 99);
+    const positive = input.consumeFrame();
+    expect(positive.orbitX).toBeCloseTo(ORBIT_RADIANS_PER_PIXEL);
+    expect(positive.orbitY).toBeCloseTo(-ORBIT_RADIANS_PER_PIXEL);
+    input.pointerMove(1, 100, 100);
+    const negative = input.consumeFrame();
+    expect(negative.orbitX).toBeCloseTo(-ORBIT_RADIANS_PER_PIXEL);
+    expect(negative.orbitY).toBeCloseTo(ORBIT_RADIANS_PER_PIXEL);
+    expect(ORBIT_RADIANS_PER_PIXEL).toBeLessThan(0.01);
   });
 
   it("clears a cancelled touch and releases its movement", () => {

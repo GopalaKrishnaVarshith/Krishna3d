@@ -9,6 +9,9 @@ export interface ControlIntent {
 
 const clamp = (value: number, limit = 1): number => Math.max(-limit, Math.min(limit, value));
 
+/** Pointer pixels become radians here; CameraRig.orbit receives radians only. */
+export const ORBIT_RADIANS_PER_PIXEL = 0.0035;
+
 /** Owns raw device state; one-shot orbit and zoom deltas are consumed per frame. */
 export class InputState {
   private readonly keys = new Set<string>();
@@ -44,8 +47,8 @@ export class InputState {
   }
   pointerMove(id: number, x: number, y: number): void {
     if (!this.pointer || this.pointer.id !== id || this.blocked) return;
-    this.orbitX += x - this.pointer.x;
-    this.orbitY += y - this.pointer.y;
+    this.orbitX += (x - this.pointer.x) * ORBIT_RADIANS_PER_PIXEL;
+    this.orbitY += (y - this.pointer.y) * ORBIT_RADIANS_PER_PIXEL;
     this.pointer.x = x;
     this.pointer.y = y;
   }

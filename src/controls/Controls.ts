@@ -102,7 +102,7 @@ export class Controls {
   private readonly onPointerDown = (event: PointerEvent): void => {
     this.syncOverlay();
     if (event.button !== 0 || this.overlayOpen()) return;
-    this.canvas.setPointerCapture?.(event.pointerId);
+    this.capturePointer(this.canvas, event.pointerId);
     this.input.pointerDown(event.pointerId, event.clientX, event.clientY);
   };
   private readonly onPointerMove = (event: PointerEvent): void =>
@@ -118,12 +118,17 @@ export class Controls {
     this.syncOverlay();
     if (this.overlayOpen()) return;
     event.preventDefault();
-    this.touchPad?.setPointerCapture?.(event.pointerId);
+    if (this.touchPad) this.capturePointer(this.touchPad, event.pointerId);
     this.input.touchStart(event.pointerId, event.clientX, event.clientY);
   };
   private readonly onTouchMove = (event: PointerEvent): void =>
     this.input.touchMove(event.pointerId, event.clientX, event.clientY);
   private readonly onTouchUp = (event: PointerEvent): void => this.input.touchEnd(event.pointerId);
+  private capturePointer(element: HTMLElement, id: number): void {
+    try { element.setPointerCapture?.(id); } catch {
+      // Capture may fail for synthetic or already-ended pointer events.
+    }
+  }
   private isEditing(target: EventTarget | null): boolean {
     const element = target as HTMLElement | null;
     return !!element?.isContentEditable || !!element?.closest?.("input, textarea, select, [role='textbox']");

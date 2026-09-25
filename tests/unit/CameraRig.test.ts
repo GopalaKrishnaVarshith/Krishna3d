@@ -1,6 +1,8 @@
 import { PerspectiveCamera, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { CameraRig, safeAvatarViewAngle } from "../../src/camera/CameraRig";
+import { World } from "../../src/world/World";
+import { ORBIT_RADIANS_PER_PIXEL } from "../../src/controls/InputState";
 
 describe("CameraRig", () => {
   it("completes authored transitions immediately under reduced motion", () => {
@@ -41,5 +43,36 @@ describe("CameraRig", () => {
     rig.snapTo(new Vector3(0, 4, 0));
     expect(camera.position.y).toBeGreaterThanOrEqual(4.5);
     expect(camera.position.distanceTo(new Vector3(0, 5.5, 0))).toBeLessThanOrEqual(2.1);
+  });
+
+  it("keeps small drags bounded while crossing both seam sectors", () => {
+    for (const sign of [-1, 1]) {
+      const camera = new PerspectiveCamera();
+      const rig = new CameraRig(camera, { reducedMotion: true });
+      rig.snapTo(new Vector3());
+      let previous = 0;
+      for (let step = 0; step < 350; step += 1) {
+        rig.orbit(sign * 2 * ORBIT_RADIANS_PER_PIXEL, 0);
+        rig.follow(new Vector3(), 1 / 60);
+        const angle = Math.atan2(camera.position.x, camera.position.z);
+        expect(Math.abs(angle - previous)).toBeLessThan(6 * Math.PI / 180);
+        expect(Math.abs(angle) <= 39 * Math.PI / 180 + 1e-4 ||
+          Math.abs(angle) >= 44 * Math.PI / 180 - 1e-4).toBe(true);
+        previous = angle;
+      }
+      expect(Math.abs(previous)).toBeGreaterThan(45 * Math.PI / 180);
+    }
+  });
+
+  it("uses world tree obstructions to push the follow camera in", () => {
+    const world = new World();
+    world.collisionBoundaries.length = 0;
+    world.collisionBoundaries.push({ center: new Vector3(0, 0, 3), radius: 0.4 });
+    const camera = new PerspectiveCamera();
+    const rig = new CameraRig(camera, { terrainHeight: (x, z) => world.getHeightAt(x, z),
+      obstructionDistance: (from, to) => world.getCameraObstructionDistance(from, to) });
+    rig.snapTo(new Vector3());
+    expect(camera.position.z).toBeLessThan(3);
+    world.dispose();
   });
 });

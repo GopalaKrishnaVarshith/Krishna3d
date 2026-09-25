@@ -23,4 +23,39 @@ describe("World navigation shell", () => {
     expect(safe.y).toBe(0);
     world.dispose();
   });
+
+  it("pushes exact obstacle-center and near-center positions out by the collision limit", () => {
+    const world = new World();
+    world.collisionBoundaries.length = 0;
+    world.collisionBoundaries.push({ center: new Vector3(0, 0, 0), radius: 0.5 });
+    for (const x of [0, 1e-7]) {
+      const safe = world.constrainPosition(new Vector3(x, 0, 0), 0.34);
+      expect(safe.length()).toBeCloseTo(0.84, 5);
+      expect(world.isWalkable(safe.x, safe.z, 0.34)).toBe(true);
+    }
+    world.dispose();
+  });
+
+  it("stays walkable after an edge obstacle pushes toward open water", () => {
+    const world = new World();
+    world.collisionBoundaries.length = 0;
+    const obstacle = { center: new Vector3(5.35, 0, 0), radius: 0.45 };
+    world.collisionBoundaries.push(obstacle);
+    const safe = world.constrainPosition(obstacle.center.clone(), 0.34);
+    expect(world.isWalkable(safe.x, safe.z, 0.34)).toBe(true);
+    expect(safe.distanceTo(obstacle.center)).toBeGreaterThanOrEqual(0.79 - 1e-5);
+    world.dispose();
+  });
+
+  it("reports the first tree obstruction along a camera ray", () => {
+    const world = new World();
+    world.collisionBoundaries.length = 0;
+    world.collisionBoundaries.push({ center: new Vector3(0, 0, 3), radius: 0.4 });
+    const distance = world.getCameraObstructionDistance(new Vector3(0, 1.5, 0), new Vector3(0, 2.5, 6));
+    expect(distance).not.toBeNull();
+    expect(distance!).toBeGreaterThan(2);
+    expect(distance!).toBeLessThan(3);
+    expect(world.getCameraObstructionDistance(new Vector3(3, 1.5, 0), new Vector3(3, 2.5, 6))).toBeNull();
+    world.dispose();
+  });
 });

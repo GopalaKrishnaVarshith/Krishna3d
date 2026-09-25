@@ -90,9 +90,95 @@ export class World {
     return ISLANDS.slice(1).some((island) => nearestOnSegment(x, z, island).distance <= BRIDGE_HALF_WIDTH - margin);
   }
 
+  /** Nearest distance along an eye-to-camera ray that intersects a tree volume. */
+  getCameraObstructionDistance(from: Vector3, to: Vector3): number | null {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dz = to.z - from.z;
+    const horizontalLengthSquared = dx * dx + dz * dz;
+    const totalLength = from.distanceTo(to);
+    if (totalLength === 0) return null;
+    let nearest = Infinity;
+    for (const obstacle of this.collisionBoundaries) {
+      const radius = obstacle.radius + 0.35;
+      const ox = from.x - obstacle.center.x;
+      const oz = from.z - obstacle.center.z;
+      const c = ox * ox + oz * oz - radius * radius;
+      let entry: number;
+      let exit: number;
+      if (horizontalLengthSquared < 1e-10) {
+        if (c > 0) continue;
+        entry = 0;
+        exit = 1;
+      } else {
+        const b = 2 * (ox * dx + oz * dz);
+        const discriminant = b * b - 4 * horizontalLengthSquared * c;
+        if (discriminant < 0) continue;
+        const root = Math.sqrt(discriminant);
+        entry = (-b - root) / (2 * horizontalLengthSquared);
+        exit = (-b + root) / (2 * horizontalLengthSquared);
+      }
+      if (Math.abs(dy) < 1e-10) {
+        if (from.y < obstacle.center.y - 0.2 || from.y > obstacle.center.y + 3) continue;
+      } else {
+        const lower = (obstacle.center.y - 0.2 - from.y) / dy;
+        const upper = (obstacle.center.y + 3 - from.y) / dy;
+        entry = Math.max(entry, Math.min(lower, upper));
+        exit = Math.min(exit, Math.max(lower, upper));
+      }
+      entry = Math.max(entry, 0);
+      exit = Math.min(exit, 1);
+      if (entry <= exit) nearest = Math.min(nearest, entry * totalLength);
+    }
+    return Number.isFinite(nearest) ? nearest : null;
+  }
+
   /** Project proposed movement onto a walkable island or bridge and repel circular obstacles. */
   constrainPosition(position: Vector3, radius = 0.34): Vector3 {
-    const result = position.clone();
+    const result = this.projectToWalkable(position.clone(), radius);
+    for (let pass = 0; pass < 3; pass += 1) {
+      let moved = false;
+      for (const obstacle of this.collisionBoundaries) {
+        const dx = result.x - obstacle.center.x;
+        const dz = result.z - obstacle.center.z;
+        const distance = Math.hypot(dx, dz);
+        const limit = obstacle.radius + radius;
+        if (distance >= limit - 1e-8) continue;
+        const unitX = distance > 1e-10 ? dx / distance : 1;
+        const unitZ = distance > 1e-10 ? dz / distance : 0;
+        let candidate = new Vector3(obstacle.center.x + unitX * limit, SURFACE_Y,
+          obstacle.center.z + unitZ * limit);
+        if (!this.isWalkable(candidate.x, candidate.z, radius) || !this.isClear(candidate, radius)) {
+          let best: Vector3 | null = null;
+          let bestScore = Infinity;
+          const preferredAngle = Math.atan2(unitZ, unitX);
+          for (let step = 0; step < 32; step += 1) {
+            const angle = preferredAngle + step * Math.PI * 2 / 32;
+            const option = new Vector3(obstacle.center.x + Math.cos(angle) * limit,
+              SURFACE_Y, obstacle.center.z + Math.sin(angle) * limit);
+            if (!this.isWalkable(option.x, option.z, radius) || !this.isClear(option, radius)) continue;
+            const score = option.distanceToSquared(result);
+            if (score < bestScore) { best = option; bestScore = score; }
+          }
+          if (best) candidate = best;
+        }
+        result.copy(candidate);
+        moved = true;
+      }
+      this.projectToWalkable(result, radius);
+      if (!moved) break;
+    }
+    result.y = SURFACE_Y;
+    return result;
+  }
+
+  private isClear(point: Vector3, radius: number): boolean {
+    return this.collisionBoundaries.every((obstacle) =>
+      Math.hypot(point.x - obstacle.center.x, point.z - obstacle.center.z)
+      >= obstacle.radius + radius - 1e-8);
+  }
+
+  private projectToWalkable(result: Vector3, radius: number): Vector3 {
     if (!this.isWalkable(result.x, result.z, radius)) {
       let bestX = 0;
       let bestZ = 0;
@@ -119,17 +205,6 @@ export class World {
         if (gap < bestDistance) { bestDistance = gap; bestX = px; bestZ = pz; }
       }
       result.set(bestX, SURFACE_Y, bestZ);
-    }
-    for (const obstacle of this.collisionBoundaries) {
-      const dx = result.x - obstacle.center.x;
-      const dz = result.z - obstacle.center.z;
-      const distance = Math.hypot(dx, dz);
-      const limit = obstacle.radius + radius;
-      if (distance < limit) {
-        const factor = limit / Math.max(distance, 0.001);
-        result.x = obstacle.center.x + (distance ? dx : 1) * factor;
-        result.z = obstacle.center.z + dz * factor;
-      }
     }
     result.y = SURFACE_Y;
     return result;
