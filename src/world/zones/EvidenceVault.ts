@@ -97,6 +97,7 @@ function symbol(kit: ZoneKit, parent: Group, index: number, p: ReturnType<typeof
 /** A walkable radial archive with exactly eleven data-bound project capsules. */
 export function createEvidenceVault(options: EvidenceVaultOptions = {}): EvidenceVaultZone {
   const kit = new ZoneKit("Evidence Vault architecture", 0, -14);
+  kit.group.position.y = -0.3;
   const p = makePalette(kit);
   const crystalMaterial = kit.material("evidence sapphire", 0x19758f, 0x318ca4,
     { roughness: 0.22, metalness: 0.26, emissive: 0x087993,
@@ -111,28 +112,29 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
 
   // Sector break at the south bridge keeps the archive floor accessible.
   kit.cylinder("vault stepped pale floor", 4.05, 4.28, 0.24, p.stone,
-    [0, 0.11, 0], 36);
+    [0, 0.182, 0], 36);
   kit.cylinder("vault dark radial inset", 3.84, 3.92, 0.04, p.dark,
-    [0, 0.255, 0], 36);
+    [0, 0.286, 0], 36);
   kit.cylinder("vault ivory marble center", 2.68, 2.75, 0.027, p.pale,
-    [0, 0.287, 0], 36);
+    [0, 0.2985, 0], 36);
   for (const radius of [1.25, 2.43, 3.7]) {
     kit.torus(`vault brass floor orbit ${radius}`, radius, 0.025,
-      p.brass, [0, 0.307, 0]).rotation.x = -Math.PI / 2;
+      p.brass, [0, 0.32, 0]).rotation.x = -Math.PI / 2;
   }
   for (let ray = 0; ray < 22; ray += 1) {
     const angle = ray * Math.PI / 11;
     kit.beam(`vault floor radial seam ${ray + 1}`,
-      [Math.cos(angle) * 1.25, 0.307, Math.sin(angle) * 1.25],
-      [Math.cos(angle) * 3.68, 0.307, Math.sin(angle) * 3.68],
+      [Math.cos(angle) * 1.25, 0.321, Math.sin(angle) * 1.25],
+      [Math.cos(angle) * 3.68, 0.321, Math.sin(angle) * 3.68],
       0.009, p.brass);
   }
 
   // Open arched wall and vaulted rib canopy remain transparent in the map view.
+  const entranceArc = (angle: number) => Math.abs(Math.atan2(
+    Math.sin(angle - Math.PI / 2), Math.cos(angle - Math.PI / 2))) < 0.65;
   for (let pier = 0; pier < 14; pier += 1) {
     const angle = pier * Math.PI * 2 / 14 + Math.PI / 14;
-    if (Math.abs(Math.atan2(Math.sin(angle - Math.PI / 2),
-      Math.cos(angle - Math.PI / 2))) < 0.27) continue;
+    if (entranceArc(angle)) continue;
     const x = Math.cos(angle) * 4.12;
     const z = Math.sin(angle) * 4.12;
     kit.cylinder(`vault arched pier ${pier + 1}`, 0.15, 0.21, 2.95,
@@ -147,7 +149,7 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
       [Math.cos(next - 0.11) * 4.12, 3.63, Math.sin(next - 0.11) * 4.12],
       [Math.cos(next) * 4.12, 3.16, Math.sin(next) * 4.12],
     ];
-    kit.curve(`vault brass arch ${pier + 1}`, arch, 0.055, p.brass);
+    if (!entranceArc(next)) kit.curve(`vault brass arch ${pier + 1}`, arch, 0.055, p.brass);
     if (pier % 2 === 0) {
       kit.curve(`vault dome rib ${pier + 1}`, [
         [x, 3.35, z], [x * 0.75, 4.25, z * 0.75],
@@ -169,7 +171,7 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
   kit.torus("vault dome crown oculus", 0.66, 0.075, p.brass,
     [0, 4.88, 0]).rotation.x = -Math.PI / 2;
   kit.bevel("vault bridge entry sill", [1.8, 0.1, 0.55], p.pale,
-    [0, 0.2, 4.05], kit.group, 0.035);
+    [0, 0.256, 4.05], kit.group, 0.035);
 
   portfolioData.projects.forEach((project, index) => {
     // 120° through 420° leaves a 60° open wedge centered on the south bridge.
@@ -244,8 +246,8 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
   return {
     id: "evidence-vault", group: kit.group,
     entryPoint: new Vector3(0, 0, -10.58),
-    cameraComposition: { position: new Vector3(0, 6.0, -6.8),
-      target: new Vector3(0, 1.58, -14), durationMs: 1050 },
+    cameraComposition: { position: new Vector3(0, 4.25, -6.5),
+      target: new Vector3(0, 1.38, -14), durationMs: 1050 },
     interactiveObjects: interactives,
     capsulePositions, cameraPoints, metricMount,
     inspectionPoint: new Vector3(0, 0, -12.7),

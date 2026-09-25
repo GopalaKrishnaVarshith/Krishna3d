@@ -1,5 +1,5 @@
 import { BufferGeometry, Float32BufferAttribute, IcosahedronGeometry,
-  InstancedMesh, Matrix4, PlaneGeometry, SphereGeometry, TorusGeometry, Vector3 } from "three";
+  InstancedMesh, Matrix4, SphereGeometry, TorusGeometry, Vector3 } from "three";
 import { type Point, ZoneKit } from "./zoneKit";
 
 function mountainRidge(depth: number, phase: number): BufferGeometry {
@@ -10,10 +10,16 @@ function mountainRidge(depth: number, phase: number): BufferGeometry {
     const high = 7 + 8 * Math.abs(Math.sin(index * 0.41 + phase))
       + 4 * Math.abs(Math.cos(index * 0.19 + phase * 2.1))
       + 3 * Math.abs(Math.sin(index * 1.11 + phase));
-    vertices.push(x, -3.25, depth, x, high, depth);
+    const foothill = -1.65 + 2.5 * Math.abs(Math.sin(index * 0.34 + phase * 1.7));
+    vertices.push(x, -3.21, depth + 19 + 2 * Math.sin(index * 0.27),
+      x, foothill, depth + 10 + 3 * Math.cos(index * 0.25 + phase),
+      x, high, depth, x, -3.21, depth - 13);
     if (index < 58) {
-      const base = index * 2;
-      indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
+      const base = index * 4;
+      for (let band = 0; band < 3; band += 1) {
+        indices.push(base + band, base + band + 1, base + band + 4,
+          base + band + 1, base + band + 5, base + band + 4);
+      }
     }
   }
   const geometry = new BufferGeometry();
@@ -25,18 +31,26 @@ function mountainRidge(depth: number, phase: number): BufferGeometry {
 
 /** Shared campus atmosphere owned by the Arrival zone so day and night use identical geometry. */
 export function buildAtmosphere(kit: ZoneKit): void {
-  const sea = kit.material("continuous coastal sea", 0x0b2c45, 0x287da8,
-    { roughness: 0.45, metalness: 0.16, doubleSided: true });
-  const seaMesh = kit.add("continuous water beyond the island plane",
-    kit.own(new PlaneGeometry(260, 260)), sea, [0, -3.235, 0]);
-  seaMesh.rotation.x = -Math.PI / 2;
-  seaMesh.receiveShadow = false;
   const far = kit.material("far coastal mountains", 0x213a53, 0x829dae,
     { roughness: 1, doubleSided: true });
   const near = kit.material("near coastal mountains", 0x294960, 0x668aa0,
     { roughness: 1, doubleSided: true });
   kit.add("distant irregular mountain ridge", kit.own(mountainRidge(-88, 2.1)), far);
   kit.add("middle irregular mountain ridge", kit.own(mountainRidge(-66, 0.3)), near);
+  const offshoreRock = kit.material("offshore faceted islets", 0x294759, 0x84979b,
+    { roughness: 1 });
+  const offshoreGreen = kit.material("offshore cypress", 0x254a48, 0x568066,
+    { roughness: 1 });
+  for (const [index, x, z, span] of [[0, -44, -38, 4.5], [1, -27, -44, 3.8],
+    [2, 29, -42, 4.2], [3, 49, -37, 5.0]] as const) {
+    const islet = kit.add(`coastal islet ${index + 1}`,
+      kit.own(new IcosahedronGeometry(1, 0)), offshoreRock,
+      [x, -2.55, z]);
+    islet.scale.set(span, 1.5, span * 0.65);
+    for (let tree = 0; tree < 3; tree += 1)
+      kit.cone(`offshore cypress ${index + 1}-${tree + 1}`, 0.28, 1.5 + tree * 0.28,
+        offshoreGreen, [x + (tree - 1) * 1.6, -0.5, z + (tree % 2) * 0.7], 7);
+  }
 
   const moon = kit.material("moon disk", 0xe8e4cb, 0xbad5df,
     { emissive: 0xf1ead3, nightEmission: 0.95, dayEmission: 0,
@@ -88,6 +102,8 @@ export function buildAtmosphere(kit: ZoneKit): void {
     { x: 13, z: -1, radius: 2.38, plantRadius: 4.01 },
     { x: 10, z: 13, radius: 2.3, plantRadius: 3.84 },
     { x: -10, z: 13, radius: 2.21, plantRadius: 3.65 },
+    { x: 11.7, z: 17.4, radius: 1.75, plantRadius: 2.82 },
+    { x: 14.2, z: 21.3, radius: 1.62, plantRadius: 2.58 },
   ];
   for (const island of islands) {
     const ring = kit.torus("island waterline foam", island.radius, 0.03,
@@ -141,12 +157,24 @@ export function buildAtmosphere(kit: ZoneKit): void {
   const flowers = kit.material("subtle flowering groundcover", 0x6d6b88, 0x8e9aab,
     { roughness: 1 });
   const shrubGeometry = kit.own(new IcosahedronGeometry(1, 0));
-  const shrubs = new InstancedMesh(shrubGeometry, shrub, 246);
-  const blooms = new InstancedMesh(shrubGeometry, flowers, 54);
+  const shrubs = new InstancedMesh(shrubGeometry, shrub, islands.length * 41);
+  const blooms = new InstancedMesh(shrubGeometry, flowers, islands.length * 9);
   shrubs.name = "batched shoreline shrubs";
   blooms.name = "batched lavender groundcover";
   let planted = 0;
   let flowerCount = 0;
+  const careerRoute: Array<[number, number]> = [
+    [7.65, 10.25], [8.75, 11.67], [10.7, 12.7], [11.7, 14.52],
+    [11.05, 16.35], [12.22, 18.18], [14.15, 19.91], [14.15, 21.62],
+  ];
+  const onCareerRoute = (x: number, z: number) => careerRoute.slice(1).some(([bx, bz], index) => {
+    const [ax, az] = careerRoute[index];
+    const dx = bx - ax;
+    const dz = bz - az;
+    const progress = Math.max(0, Math.min(1,
+      ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+    return Math.hypot(x - ax - dx * progress, z - az - dz * progress) < 1.22;
+  });
   islands.forEach((island, islandIndex) => {
     const opening = Math.atan2(-island.z, -island.x);
     for (let index = 0; index < 41; index += 1) {
@@ -156,15 +184,18 @@ export function buildAtmosphere(kit: ZoneKit): void {
         const route = Math.atan2(destination.z, destination.x);
         return Math.abs(Math.atan2(Math.sin(angle - route), Math.cos(angle - route))) < 0.16;
       });
-      if (plazaExit || (islandIndex !== 0 && Math.abs(diff) < 0.22)) {
+      const arrivalExit = islandIndex === 0 &&
+        Math.abs(Math.atan2(Math.sin(angle - Math.PI / 2), Math.cos(angle - Math.PI / 2))) < 0.2;
+      const radius = island.plantRadius + Math.sin(index * 4.7) * 0.13;
+      const x = island.x + Math.cos(angle) * radius;
+      const z = island.z + Math.sin(angle) * radius;
+      if (plazaExit || arrivalExit || onCareerRoute(x, z) ||
+        (islandIndex !== 0 && Math.abs(diff) < 0.22)) {
         // Keep instance counts stable with very small, buried placeholder transforms.
         shrubs.setMatrixAt(planted++, new Matrix4().makeScale(0, 0, 0));
         if (index % 5 === 0) blooms.setMatrixAt(flowerCount++, new Matrix4().makeScale(0, 0, 0));
         continue;
       }
-      const radius = island.plantRadius + Math.sin(index * 4.7) * 0.13;
-      const x = island.x + Math.cos(angle) * radius;
-      const z = island.z + Math.sin(angle) * radius;
       const scale = 0.18 + (index % 5) * 0.055;
       shrubs.setMatrixAt(planted++, new Matrix4().makeScale(scale * 1.35, scale * 0.7, scale)
         .setPosition(x, 0.1 + scale * 0.35, z));
@@ -174,29 +205,14 @@ export function buildAtmosphere(kit: ZoneKit): void {
       }
     }
   });
-  // Count 54 accommodates at most 9 blooms per island; unused matrices stay invisible.
-  for (; flowerCount < 54; flowerCount += 1)
+  // Nine bloom slots per clearing keep the instance count fixed.
+  for (; flowerCount < islands.length * 9; flowerCount += 1)
     blooms.setMatrixAt(flowerCount, new Matrix4().makeScale(0, 0, 0));
   shrubs.instanceMatrix.needsUpdate = true;
   blooms.instanceMatrix.needsUpdate = true;
   shrubs.castShadow = true;
   kit.group.add(shrubs, blooms);
 
-  const rail = kit.material("bridge teal wayfinding rail", 0x70d7df, 0x6faebe,
-    { emissive: 0x2dc9dc, nightEmission: 0.9, dayEmission: 0.12,
-      roughness: 0.3, metalness: 0.4 });
-  for (const island of islands.slice(1)) {
-    const length = Math.hypot(island.x, island.z);
-    const perpendicularX = -island.z / length;
-    const perpendicularZ = island.x / length;
-    for (const side of [-1, 1]) {
-      const points: Point[] = [];
-      for (const t of [0.27, 0.4, 0.52, 0.64, 0.76])
-        points.push([island.x * t + perpendicularX * side * 1.09, 0.035,
-          island.z * t + perpendicularZ * side * 1.09]);
-      kit.curve("continuous luminous bridge edge", points, 0.018, rail);
-    }
-  }
   const cascade = kit.material("sparse cliff cascade", 0x75d4e5, 0xa5dce9,
     { emissive: 0x39b5d8, nightEmission: 0.55, dayEmission: 0.08,
       transparent: true, nightOpacity: 0.74, dayOpacity: 0.63 });

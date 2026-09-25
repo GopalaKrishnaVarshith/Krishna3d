@@ -10,24 +10,35 @@ export interface AutomationLabOptions extends ZoneOptions {
 /** Glazed workshop with visible routing machinery and four data-bound capability consoles. */
 export function createAutomationLab(options: AutomationLabOptions = {}): DynamicWorldZone {
   const kit = new ZoneKit("Automation Lab architecture", -13, 0);
+  kit.group.position.y = -0.295;
   const p = makePalette(kit);
+  const floorMaterial = kit.material("lab illuminated graphite floor", 0x315366, 0xa9b9bb,
+    { roughness: 0.64, metalness: 0.16 });
+  const conveyorMaterial = kit.material("lab controlled routing deck", 0x1c6978, 0x5a99a3,
+    { roughness: 0.4, metalness: 0.24 });
+  const screenMaterial = kit.material("lab legible capability glass", 0x267e91, 0x6ba7b5,
+    { roughness: 0.24, metalness: 0.18, emissive: 0x198ca3,
+      nightEmission: 0.26, dayEmission: 0.08 });
   const interactives: InteractiveTarget[] = [];
   const travellingNodes: Group[] = [];
   const arms: Group[] = [];
+  const processBeacons: Group[] = [];
   let reducedMotion = options.reducedMotion ?? false;
   let elapsed = 0;
-  kit.lamp("workshop warm task lighting", 0xffd39a, 3.2, 0.12, 8, [0, 3.06, 0]);
+  kit.lamp("workshop warm task lighting", 0xffd39a, 6.0, 0.2, 9, [0, 3.06, 0]);
 
   kit.bevel("lab pale plinth", [7.3, 0.27, 5.65], p.stone, [0, 0.11, 0], kit.group, 0.075);
-  kit.bevel("lab dark workshop floor", [6.86, 0.055, 5.2], p.dark,
+  kit.bevel("lab dark workshop floor", [6.86, 0.055, 5.2], floorMaterial,
     [0, 0.28, 0], kit.group, 0.03);
   kit.bevel("lab east entry apron", [1.24, 0.105, 2.08], p.pale,
-    [3.87, 0.065, 0], kit.group, 0.035);
+    [3.87, 0.2525, 0], kit.group, 0.035);
   kit.beam("lab east entry brass edge", [3.3, 0.32, -1.06], [3.3, 0.32, 1.06], 0.025, p.brass);
 
   // A glazed pavilion reads through its interior from the campus map; no opaque solid roof.
   for (const side of [-1, 1]) {
     const z = side * 2.55;
+    kit.bevel(`lab masonry knee wall ${side}`, [6.75, 0.56, 0.16], p.pale,
+      [0, 0.61, z], kit.group, 0.04);
     kit.box(`lab long glazed wall ${side}`, [6.62, 2.85, 0.035], p.glass,
       [0, 1.76, z]);
     kit.box(`lab lower brass sill ${side}`, [6.95, 0.09, 0.09], p.brass,
@@ -42,6 +53,8 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Dynamic
   }
   kit.box("lab west glazed wall", [0.035, 2.86, 5.2], p.glass,
     [-3.38, 1.76, 0]);
+  kit.bevel("lab west masonry service wall", [0.2, 0.73, 5.24], p.stone,
+    [-3.39, 0.74, 0], kit.group, 0.04);
   for (const z of [-2.55, -1.27, 0, 1.27, 2.55]) {
     kit.box(`lab west wall mullion ${z}`, [0.07, 3.02, 0.065], p.brass,
       [-3.4, 1.81, z]);
@@ -51,6 +64,9 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Dynamic
       [3.38, 1.76, z]);
   }
   kit.box("lab east lintel", [0.18, 0.21, 5.32], p.brass, [3.38, 3.31, 0]);
+  kit.curve("lab east sculpted entry canopy", [[3.35, 2.82, -2.55],
+    [3.68, 3.24, -1.42], [3.79, 3.46, 0], [3.68, 3.24, 1.42],
+    [3.35, 2.82, 2.55]], 0.09, p.pale);
   for (const x of [-3.42, -1.75, 0, 1.75, 3.42]) {
     kit.box(`lab roof cross frame ${x}`, [0.11, 0.11, 5.36], p.brass,
       [x, 3.38, 0]);
@@ -61,11 +77,14 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Dynamic
   }
   kit.box("lab ridge skylight rail", [6.95, 0.08, 0.1], p.tealLight,
     [0, 3.43, 0]);
+  for (const z of [-2.31, 2.31])
+    kit.box(`lab warm roof task strip ${z}`, [6.5, 0.035, 0.06],
+      p.goldLight, [0, 3.26, z]);
 
   // Two parallel routing rails and a broad lit conveyor make the process legible at map distance.
   kit.bevel("lab conveyor base", [5.55, 0.21, 1.23], p.brass,
     [0, 0.54, 0], kit.group, 0.04);
-  kit.bevel("lab moving process deck", [5.29, 0.075, 0.98], p.deep,
+  kit.bevel("lab moving process deck", [5.29, 0.075, 0.98], conveyorMaterial,
     [0, 0.686, 0], kit.group, 0.025);
   for (const side of [-1, 1]) {
     kit.box(`lab cyan routing rail ${side}`, [5.2, 0.026, 0.035], p.tealLight,
@@ -102,6 +121,21 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Dynamic
     [-1.04, 0.73, -1.16], [-2.2, 0.73, -1.16]], 0.035, p.tealLight);
   kit.curve("release branch", [[-0.1, 0.73, 0], [-0.65, 0.73, 0.48],
     [-1.2, 0.73, 0.85], [-2.2, 0.73, 0.85]], 0.035, p.goldLight);
+  for (const [index, x, material] of [
+    [0, 2.2, p.tealLight], [1, 0.45, p.goldLight], [2, -1.95, p.tealLight],
+  ] as const) {
+    const beacon = new Group();
+    beacon.name = ["intake", "decision", "release"][index] + " workflow beacon";
+    beacon.position.set(x, 2.55, 0);
+    kit.group.add(beacon);
+    kit.torus(`workflow stage ${index + 1} upper ring`, 0.27, 0.035,
+      material, [0, 0, 0], beacon, 24).rotation.x = Math.PI / 2;
+    kit.cylinder(`workflow stage ${index + 1} hanging optic`, 0.09, 0.09,
+      0.38, material, [0, -0.3, 0], 10, beacon);
+    kit.beam(`workflow stage ${index + 1} ceiling tether`,
+      [0, 0.28, 0], [0, 0.84, 0], 0.028, p.brass, beacon);
+    processBeacons.push(beacon);
+  }
 
   // Three articulated inspection arms attach to an overhead machine gantry.
   for (let index = 0; index < 3; index += 1) {
@@ -125,6 +159,23 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Dynamic
       [0.73, 1.02, -z * 0.23], 10, arm);
     arms.push(arm);
   }
+  const heroArm = new Group();
+  heroArm.name = "large visible workflow inspection arm";
+  heroArm.position.set(2.37, 0.48, -1.15);
+  kit.group.add(heroArm);
+  kit.cylinder("hero arm sculpted turntable", 0.49, 0.54, 0.24,
+    p.brass, [0, 0.09, 0], 12, heroArm);
+  kit.beam("hero arm ivory lower link", [0, 0.21, 0], [-0.18, 1.45, 0.06],
+    0.15, p.pale, heroArm);
+  kit.sphere("hero arm brass elbow", 0.24, p.brass,
+    [-0.18, 1.45, 0.06], heroArm);
+  kit.beam("hero arm ivory upper link", [-0.18, 1.45, 0.06],
+    [-1.08, 1.85, 0.78], 0.12, p.pale, heroArm);
+  kit.bevel("hero arm lit review head", [0.49, 0.28, 0.43], p.dark,
+    [-1.1, 1.84, 0.78], heroArm, 0.045);
+  kit.cylinder("hero arm scanner lens", 0.13, 0.13, 0.09,
+    p.tealLight, [-1.1, 1.64, 0.78], 12, heroArm);
+  arms.push(heroArm);
 
   portfolioData.skillDomains.forEach((domain, index) => {
     const z = index < 2 ? -1.78 : 1.78;
@@ -135,7 +186,7 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Dynamic
     kit.group.add(consoleGroup);
     kit.cylinder(`${domain.id} console pedestal`, 0.38, 0.5, 0.7, p.dark,
       [0, 0.68, 0], 8, consoleGroup);
-    const screen = kit.bevel(`${domain.id} console screen`, [0.75, 0.54, 0.06], p.deep,
+    const screen = kit.bevel(`${domain.id} console screen`, [0.75, 0.54, 0.06], screenMaterial,
       [0, 1.22, 0], consoleGroup, 0.04);
     screen.rotation.x = index < 2 ? 0.21 : -0.21;
     kit.box(`${domain.id} console glyph`, [0.51, 0.04, 0.035], p.tealLight,
@@ -153,8 +204,8 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Dynamic
   return {
     id: "automation-lab", group: kit.group,
     entryPoint: new Vector3(-9.55, 0, 0),
-    cameraComposition: { position: new Vector3(-7.3, 5.0, 6.1),
-      target: new Vector3(-13, 1.43, 0), durationMs: 1050 },
+    cameraComposition: { position: new Vector3(-6.8, 3.1, 5.4),
+      target: new Vector3(-13, 1.38, 0), durationMs: 1050 },
     interactiveObjects: interactives,
     setReducedMotion(value) { reducedMotion = value; },
     update(delta) {
@@ -168,6 +219,9 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Dynamic
       arms.forEach((arm, index) => {
         arm.rotation.y = Math.sin(elapsed * 0.85 + index * 1.7) * 0.26;
         arm.rotation.z = Math.sin(elapsed * 0.7 + index) * 0.065;
+      });
+      processBeacons.forEach((beacon, index) => {
+        beacon.scale.setScalar(0.96 + 0.05 * Math.sin(elapsed * 1.4 - index * 0.8));
       });
     },
     dispose: () => kit.dispose(),

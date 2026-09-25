@@ -1,12 +1,14 @@
 import {
-  BoxGeometry, BufferAttribute, ConeGeometry, CylinderGeometry, DoubleSide, Group,
-  InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, PlaneGeometry, TorusGeometry, Vector3,
-  type BufferGeometry, type Material,
+  BufferAttribute, BufferGeometry, CatmullRomCurve3, ConeGeometry, CylinderGeometry, DoubleSide, Group,
+  InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, PlaneGeometry, SphereGeometry, TorusGeometry,
+  TubeGeometry, Vector3,
+  type Material,
 } from "three";
 import { ZoneManager } from "./ZoneManager";
 import type { CollisionCircle, WorldZone } from "./types";
 
 interface Island { id: string; x: number; z: number; radius: number }
+interface BridgeRoute { id: string; fromX: number; fromZ: number; toX: number; toZ: number; bend: number }
 const ISLANDS: Island[] = [
   { id: "plaza", x: 0, z: 0, radius: 5.8 },
   { id: "automation-lab", x: -13, z: 0, radius: 4.5 },
@@ -14,6 +16,19 @@ const ISLANDS: Island[] = [
   { id: "observatory", x: 13, z: -1, radius: 4.4 },
   { id: "career-trail", x: 10, z: 13, radius: 4.3 },
   { id: "contact-portal", x: -10, z: 13, radius: 4.1 },
+];
+const CAREER_TERRACES: Island[] = [
+  { id: "career-middle", x: 11.7, z: 17.4, radius: 3.15 },
+  { id: "career-end", x: 14.2, z: 21.3, radius: 2.9 },
+];
+const TERRAIN = [...ISLANDS, ...CAREER_TERRACES];
+const ROUTES: BridgeRoute[] = [
+  ...ISLANDS.slice(1).map((island, index) => ({ id: island.id,
+    fromX: 0, fromZ: 0, toX: island.x, toZ: island.z,
+    bend: [0.7, -0.55, 0.7, -0.7, 0.65][index] })),
+  { id: "arrival-approach", fromX: 0, fromZ: 4, toX: 0, toZ: 10.8, bend: 0 },
+  { id: "career-middle", fromX: 10, fromZ: 13, toX: 11.7, toZ: 17.4, bend: -0.25 },
+  { id: "career-end", fromX: 11.7, fromZ: 17.4, toX: 14.2, toZ: 21.3, bend: 0.36 },
 ];
 const BRIDGE_HALF_WIDTH = 1.35;
 const SURFACE_Y = 0;
@@ -35,12 +50,71 @@ function irregularDisk(): CylinderGeometry {
   return geometry;
 }
 
-function nearestOnSegment(x: number, z: number, island: Island): { x: number; z: number; distance: number } {
-  const denominator = island.x * island.x + island.z * island.z;
-  const progress = denominator === 0 ? 0 : Math.max(0, Math.min(1, (x * island.x + z * island.z) / denominator));
-  const px = island.x * progress;
-  const pz = island.z * progress;
-  return { x: px, z: pz, distance: Math.hypot(x - px, z - pz) };
+export function bridgePoint(route: BridgeRoute, t: number): { x: number; z: number } {
+  const dx = route.toX - route.fromX;
+  const dz = route.toZ - route.fromZ;
+  const length = Math.hypot(dx, dz);
+  const bow = route.bend * Math.sin(Math.PI * t);
+  return { x: route.fromX + dx * t - dz / length * bow,
+    z: route.fromZ + dz * t + dx / length * bow };
+}
+
+function nearestOnRoute(x: number, z: number, route: BridgeRoute): { x: number; z: number; distance: number } {
+  let nearestX = route.fromX;
+  let nearestZ = route.fromZ;
+  let bestSquared = Infinity;
+  let previous = bridgePoint(route, 0);
+  for (let step = 1; step <= 24; step += 1) {
+    const next = bridgePoint(route, step / 24);
+    const dx = next.x - previous.x;
+    const dz = next.z - previous.z;
+    const lengthSquared = dx * dx + dz * dz;
+    const t = Math.max(0, Math.min(1,
+      ((x - previous.x) * dx + (z - previous.z) * dz) / lengthSquared));
+    const px = previous.x + dx * t;
+    const pz = previous.z + dz * t;
+    const squared = (x - px) ** 2 + (z - pz) ** 2;
+    if (squared < bestSquared) { bestSquared = squared; nearestX = px; nearestZ = pz; }
+    previous = next;
+  }
+  return { x: nearestX, z: nearestZ, distance: Math.sqrt(bestSquared) };
+}
+
+function bridgeNormal(route: BridgeRoute, t: number): { x: number; z: number } {
+  const before = bridgePoint(route, Math.max(0, t - 0.004));
+  const after = bridgePoint(route, Math.min(1, t + 0.004));
+  const dx = after.x - before.x;
+  const dz = after.z - before.z;
+  const length = Math.hypot(dx, dz);
+  return { x: -dz / length, z: dx / length };
+}
+
+function bridgeRibbon(route: BridgeRoute): BufferGeometry {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let step = 0; step <= 36; step += 1) {
+    const t = step / 36;
+    const center = bridgePoint(route, t);
+    const normal = bridgeNormal(route, t);
+    for (const side of [-1, 1]) {
+      const x = center.x + normal.x * BRIDGE_HALF_WIDTH * side;
+      const z = center.z + normal.z * BRIDGE_HALF_WIDTH * side;
+      positions.push(x, SURFACE_Y, z, x, -0.18, z);
+    }
+    if (step < 36) {
+      const i = step * 4;
+      const j = i + 4;
+      indices.push(i, i + 2, j, i + 2, j + 2, j); // walkable top
+      indices.push(i, j, i + 1, i + 1, j, j + 1); // right stone edge
+      indices.push(i + 2, i + 3, j + 2, j + 2, i + 3, j + 3); // left edge
+      indices.push(i + 1, j + 1, i + 3, i + 3, j + 1, j + 3); // underside
+    }
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new BufferAttribute(Float32Array.from(positions), 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 /** Navigable terrain shell. Task 7 can fill the registered zone groups with architecture. */
@@ -48,14 +122,15 @@ export class World {
   readonly group = new Group();
   readonly zones: ZoneManager;
   readonly collisionBoundaries: CollisionCircle[] = [];
-  readonly spawnPoint = new Vector3(0, SURFACE_Y, 3.7);
+  private readonly fixedMovementObstacles: CollisionCircle[] = [];
+  readonly spawnPoint = new Vector3(0, SURFACE_Y, 7.25);
   private readonly geometries = new Set<BufferGeometry>();
   private readonly materials = new Set<Material>();
   private readonly islandGeometry = this.ownGeometry(irregularDisk());
   private readonly undersideGeometry = this.ownGeometry(new ConeGeometry(1, 2.5, 10));
-  private readonly bridgeGeometry = this.ownGeometry(new BoxGeometry(1, 0.16, 1));
-  private readonly inlayGeometry = this.ownGeometry(new BoxGeometry(1, 0.018, 0.025));
   private readonly trunkGeometry = this.ownGeometry(new CylinderGeometry(0.07, 0.11, 0.8, 5));
+  private readonly parapetGeometry = this.ownGeometry(new CylinderGeometry(0.07, 0.1, 0.68, 8));
+  private readonly capGeometry = this.ownGeometry(new SphereGeometry(0.12, 8, 6));
   private readonly foliageGeometry = this.ownGeometry(new ConeGeometry(0.42, 1.45, 7));
   private readonly ground = this.ownMaterial(new MeshStandardMaterial({ color: 0xb6b9a6, roughness: 0.93 }));
   private readonly rock = this.ownMaterial(new MeshStandardMaterial({ color: 0x435665, roughness: 1, flatShading: true }));
@@ -64,21 +139,35 @@ export class World {
   private readonly water = this.ownMaterial(new MeshStandardMaterial({ color: 0x17495b, metalness: 0.38, roughness: 0.38, transparent: true, opacity: 0.78, side: DoubleSide }));
   private readonly foliage = this.ownMaterial(new MeshStandardMaterial({ color: 0x32665a, roughness: 1, flatShading: true }));
   private readonly bark = this.ownMaterial(new MeshStandardMaterial({ color: 0x6c5a4d, roughness: 1 }));
+  private readonly edgeLight = this.ownMaterial(new MeshStandardMaterial({ color: 0x3cb6c5,
+    emissive: 0x2ccde4, emissiveIntensity: 0.74, metalness: 0.18, roughness: 0.24 }));
+  private readonly lantern = this.ownMaterial(new MeshStandardMaterial({ color: 0xd3b575,
+    emissive: 0xffb452, emissiveIntensity: 0.94, metalness: 0.48, roughness: 0.28 }));
   private disposed = false;
 
   constructor(onNavigate?: (zone: WorldZone) => void) {
     this.group.name = "FloatingRegulatoryCampus";
+    this.edgeLight.userData.worldTheme = {
+      night: { color: 0x3cb6c5, emissive: 0x2ccde4, emissiveIntensity: 0.74 },
+      day: { color: 0x64acba, emissive: 0x2ccde4, emissiveIntensity: 0.1 },
+    };
+    this.lantern.userData.worldTheme = {
+      night: { color: 0xd3b575, emissive: 0xffb452, emissiveIntensity: 0.94 },
+      day: { color: 0xc09f60, emissive: 0xffb452, emissiveIntensity: 0.08 },
+    };
     this.zones = new ZoneManager(onNavigate);
     this.group.add(this.zones.group);
-    const water = new Mesh(this.ownGeometry(new PlaneGeometry(90, 90)), this.water);
+    const water = new Mesh(this.ownGeometry(new PlaneGeometry(260, 260)), this.water);
     water.name = "shared water plane";
     water.rotation.x = -Math.PI / 2;
     water.position.y = WATER_Y;
     this.group.add(water);
     for (const island of ISLANDS) this.createIsland(island);
-    for (const island of ISLANDS.slice(1)) this.createBridge(island);
+    for (const island of CAREER_TERRACES) this.createTerrain(island);
+    for (const route of ROUTES) this.createBridge(route);
     this.createPlaza();
     this.createVegetation();
+    this.createMovementObstacles();
   }
 
   getHeightAt(x: number, z: number): number {
@@ -86,8 +175,8 @@ export class World {
   }
 
   isWalkable(x: number, z: number, margin = 0): boolean {
-    if (ISLANDS.some((island) => Math.hypot(x - island.x, z - island.z) <= island.radius - margin)) return true;
-    return ISLANDS.slice(1).some((island) => nearestOnSegment(x, z, island).distance <= BRIDGE_HALF_WIDTH - margin);
+    if (TERRAIN.some((island) => Math.hypot(x - island.x, z - island.z) <= island.radius - margin)) return true;
+    return ROUTES.some((route) => nearestOnRoute(x, z, route).distance <= BRIDGE_HALF_WIDTH - margin);
   }
 
   /** Nearest distance along an eye-to-camera ray that intersects a tree volume. */
@@ -100,6 +189,7 @@ export class World {
     if (totalLength === 0) return null;
     let nearest = Infinity;
     for (const obstacle of this.collisionBoundaries) {
+      if (this.fixedMovementObstacles.includes(obstacle)) continue;
       const radius = obstacle.radius + 0.35;
       const ox = from.x - obstacle.center.x;
       const oz = from.z - obstacle.center.z;
@@ -183,7 +273,7 @@ export class World {
       let bestX = 0;
       let bestZ = 0;
       let bestDistance = Infinity;
-      for (const island of ISLANDS) {
+      for (const island of TERRAIN) {
         const dx = result.x - island.x;
         const dz = result.z - island.z;
         const length = Math.hypot(dx, dz);
@@ -194,8 +284,8 @@ export class World {
         const distance = Math.hypot(result.x - px, result.z - pz);
         if (distance < bestDistance) { bestDistance = distance; bestX = px; bestZ = pz; }
       }
-      for (const island of ISLANDS.slice(1)) {
-        const near = nearestOnSegment(result.x, result.z, island);
+      for (const route of ROUTES) {
+        const near = nearestOnRoute(result.x, result.z, route);
         const distance = Math.hypot(result.x - near.x, result.z - near.z);
         const limit = Math.max(0, BRIDGE_HALF_WIDTH - radius);
         const scale = distance > limit && distance > 0 ? limit / distance : 1;
@@ -221,12 +311,29 @@ export class World {
     for (const geometry of this.geometries) geometry.dispose();
     for (const material of this.materials) material.dispose();
     this.collisionBoundaries.length = 0;
+    this.fixedMovementObstacles.length = 0;
   }
 
   private createIsland(island: Island): void {
+    this.createTerrain(island);
+    const zoneGroup = new Group();
+    zoneGroup.name = `${island.id} zone`;
+    zoneGroup.position.set(island.x, 0, island.z);
+    const entry = island.id === "plaza" ? this.spawnPoint.clone() :
+      new Vector3(island.x * 0.78, SURFACE_Y, island.z * 0.78);
+    const zone: WorldZone = { id: island.id, group: zoneGroup, entryPoint: entry,
+      cameraComposition: { position: entry.clone().add(new Vector3(0, 4.2, 6)),
+        target: entry.clone().add(new Vector3(0, 1.4, 0)), durationMs: 850 },
+      interactiveObjects: [], update: () => undefined, dispose: () => undefined };
+    this.zones.register(zone);
+  }
+
+  private createTerrain(island: Island): void {
     const surface = new Mesh(this.islandGeometry, this.ground);
     surface.name = `${island.id} clearing`;
-    surface.position.set(island.x, -0.275, island.z);
+    const careerDepth = island.id === "career-middle" ? -0.008 :
+      island.id === "career-end" ? -0.012 : 0;
+    surface.position.set(island.x, -0.275 + careerDepth, island.z);
     surface.scale.set(island.radius, 1, island.radius);
     surface.receiveShadow = true;
     this.group.add(surface);
@@ -240,36 +347,57 @@ export class World {
       rock.castShadow = true;
       this.group.add(rock);
     }
-    const zoneGroup = new Group();
-    zoneGroup.name = `${island.id} zone`;
-    zoneGroup.position.set(island.x, 0, island.z);
-    const entry = new Vector3(island.x * 0.78, SURFACE_Y, island.z * 0.78);
-    const zone: WorldZone = { id: island.id, group: zoneGroup, entryPoint: entry,
-      cameraComposition: { position: entry.clone().add(new Vector3(0, 4.2, 6)),
-        target: entry.clone().add(new Vector3(0, 1.4, 0)), durationMs: 850 },
-      interactiveObjects: [], update: () => undefined, dispose: () => undefined };
-    this.zones.register(zone);
   }
 
-  private createBridge(island: Island): void {
-    const length = Math.hypot(island.x, island.z);
-    const angle = Math.atan2(island.x, island.z);
-    const bridge = new Mesh(this.bridgeGeometry, this.path);
-    bridge.name = `plaza to ${island.id} bridge`;
-    bridge.position.set(island.x / 2, -0.08, island.z / 2);
-    bridge.rotation.y = angle;
-    bridge.scale.set(BRIDGE_HALF_WIDTH * 2, 1, length);
+  private createBridge(route: BridgeRoute): void {
+    const bridge = new Mesh(this.ownGeometry(bridgeRibbon(route)), this.path);
+    bridge.name = `${route.id} curved walkable bridge`;
     bridge.receiveShadow = true;
     this.group.add(bridge);
-    for (const edge of [-1, 1]) {
-      const line = new Mesh(this.inlayGeometry, this.brass);
-      line.name = `${island.id} brass path inlay`;
-      line.position.set(island.x / 2 + Math.cos(angle) * edge * 0.95, 0.014,
-        island.z / 2 - Math.sin(angle) * edge * 0.95);
-      line.rotation.y = angle - Math.PI / 2;
-      line.scale.x = length;
-      this.group.add(line);
+    if (route.id === "career-middle" || route.id === "career-end") return;
+    const start = route.id === "arrival-approach" ? 0.25 : 0.39;
+    const end = route.id === "arrival-approach" ? 0.98 : 0.75;
+    for (const side of [-1, 1]) {
+      for (const [name, lateral, elevation, radius, material] of [
+        ["stone parapet curb", 1.29, 0.12, 0.095, this.path],
+        ["brass parapet handrail", 1.29, 0.69, 0.04, this.brass],
+        ["teal path light", 1.03, 0.012, 0.018, this.edgeLight],
+      ] as const) {
+        const points: Vector3[] = [];
+        for (let step = 0; step <= 20; step += 1) {
+          const t = start + (end - start) * step / 20;
+          const center = bridgePoint(route, t);
+          const normal = bridgeNormal(route, t);
+          points.push(new Vector3(center.x + normal.x * lateral * side,
+            elevation, center.z + normal.z * lateral * side));
+        }
+        const line = new Mesh(this.ownGeometry(new TubeGeometry(
+          new CatmullRomCurve3(points), 40, radius, 6, false)), material);
+        line.name = `${route.id} ${name} ${side}`;
+        this.group.add(line);
+      }
     }
+    const posts = new InstancedMesh(this.parapetGeometry, this.path, 12);
+    const caps = new InstancedMesh(this.capGeometry, this.lantern, 12);
+    posts.name = `${route.id} batched parapet posts`;
+    caps.name = `${route.id} batched warm lantern heads`;
+    const matrix = new Matrix4();
+    for (let index = 0; index < 6; index += 1) {
+      const t = start + 0.04 + index * (end - start - 0.08) / 5;
+      const center = bridgePoint(route, t);
+      const normal = bridgeNormal(route, t);
+      for (const side of [-1, 1]) {
+        const slot = index * 2 + (side + 1) / 2;
+        const x = center.x + normal.x * 1.28 * side;
+        const z = center.z + normal.z * 1.28 * side;
+        posts.setMatrixAt(slot, matrix.identity().setPosition(x, 0.34, z));
+        caps.setMatrixAt(slot, matrix.identity().setPosition(x, 0.73, z));
+      }
+    }
+    posts.instanceMatrix.needsUpdate = true;
+    caps.instanceMatrix.needsUpdate = true;
+    posts.castShadow = true;
+    this.group.add(posts, caps);
   }
 
   private createPlaza(): void {
@@ -282,20 +410,21 @@ export class World {
     }
     const plateau = new Mesh(this.ownGeometry(new CylinderGeometry(2.05, 2.2, 0.14, 32)), this.path);
     plateau.name = "arrival raised plateau";
-    plateau.position.y = 0.015;
+    plateau.position.y = -0.07;
     this.group.add(plateau);
   }
 
   private createVegetation(): void {
     const positions: Vector3[] = [];
-    for (const island of ISLANDS) {
+    for (const island of TERRAIN) {
+      if (island.id.startsWith("career")) continue;
       for (let i = 0; i < 9; i += 1) {
         const angle = (i / 9) * Math.PI * 2 + island.radius;
-        const radius = island.radius * (0.72 + 0.12 * Math.sin(i * 2.4));
+        const radius = island.radius * (0.88 + 0.07 * Math.sin(i * 2.4));
         const x = island.x + Math.cos(angle) * radius;
         const z = island.z + Math.sin(angle) * radius;
         if (island.id === "plaza" && z > 2.4 && Math.abs(x) < 2.2) continue;
-        if (nearestOnSegment(x, z, island).distance < BRIDGE_HALF_WIDTH + 0.5) continue;
+        if (ROUTES.some((route) => nearestOnRoute(x, z, route).distance < BRIDGE_HALF_WIDTH + 0.5)) continue;
         positions.push(new Vector3(x, 0, z));
       }
     }
@@ -316,6 +445,22 @@ export class World {
     trunks.instanceMatrix.needsUpdate = true;
     foliage.castShadow = true;
     this.group.add(foliage, trunks);
+  }
+
+  private createMovementObstacles(): void {
+    const add = (x: number, z: number, radius: number) => {
+      const obstacle = { center: new Vector3(x, 0, z), radius };
+      this.fixedMovementObstacles.push(obstacle);
+      this.collisionBoundaries.push(obstacle);
+    };
+    add(1.58, 0.48, 0.55); // Arrival fountain
+    for (const x of [-15.0, -13.4, -11.8]) add(x, 0, 0.65); // Lab conveyor
+    add(0, -14, 1.11); // Vault inspection station
+    for (let index = 0; index < 11; index += 1) {
+      const angle = (120 + index * 30) * Math.PI / 180;
+      add(Math.cos(angle) * 3.17, -14 + Math.sin(angle) * 3.17, 0.38);
+    }
+    add(13, -1, 1.17); // Observatory instrument
   }
 
   private ownGeometry<T extends BufferGeometry>(geometry: T): T { this.geometries.add(geometry); return geometry; }

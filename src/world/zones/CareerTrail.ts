@@ -7,6 +7,11 @@ export interface CareerTrailOptions extends ZoneOptions {
   onExperienceSelect?: (id: string) => void;
 }
 
+export interface CareerTrailZone extends DynamicWorldZone {
+  readonly milestonePositions: Map<string, Vector3>;
+  readonly milestoneApproaches: Map<string, Vector3>;
+}
+
 function pathSurface(curve: CatmullRomCurve3, width: number): BufferGeometry {
   const vertices: number[] = [];
   const normals: number[] = [];
@@ -34,28 +39,34 @@ function pathSurface(curve: CatmullRomCurve3, width: number): BufferGeometry {
 }
 
 /** An S-shaped planted causeway whose eight fixtures follow the approved role records. */
-export function createCareerTrail(options: CareerTrailOptions = {}): DynamicWorldZone {
+export function createCareerTrail(options: CareerTrailOptions = {}): CareerTrailZone {
   const kit = new ZoneKit("Career Trail landscape", 10, 13);
-  kit.group.scale.x = -1;
+  kit.group.position.y = -0.2;
   const p = makePalette(kit);
   const trailStone = kit.material("walkable pale-stone career ribbon", 0xb9c7cb, 0xf2ead9,
     { roughness: 0.88, doubleSided: true });
   const interactives: InteractiveTarget[] = [];
+  const milestonePositions = new Map<string, Vector3>();
+  const milestoneApproaches = new Map<string, Vector3>();
   let reducedMotion = options.reducedMotion ?? false;
   let elapsed = 0;
   kit.lamp("career trail guidance pool", 0xffd6a5, 2.1, 0.1, 8, [0, 3, 0]);
 
-  kit.cylinder("career terrace retaining step", 3.7, 3.95, 0.18,
-    p.stone, [0, 0.075, 0], 28);
+  for (const [name, x, z, radius] of [
+    ["career starting terrace", 0, 0, 3.72],
+    ["career middle terrace", 1.7, 4.4, 2.92],
+    ["career final terrace", 4.2, 8.3, 2.7],
+  ] as const) kit.cylinder(name, radius, radius + 0.15, 0.18,
+    p.stone, [x, 0.128, z], 28);
   const curve = new CatmullRomCurve3([
-    new Vector3(2.35, 0.22, -2.75),
-    new Vector3(1.45, 0.22, -1.82),
-    new Vector3(-0.35, 0.22, -1.37),
-    new Vector3(-1.34, 0.22, -0.44),
-    new Vector3(-1.15, 0.22, 0.72),
-    new Vector3(0.08, 0.22, 1.39),
-    new Vector3(-0.58, 0.22, 2.3),
-    new Vector3(-2.25, 0.22, 2.72),
+    new Vector3(-2.35, 0.22, -2.75),
+    new Vector3(-1.25, 0.22, -1.33),
+    new Vector3(0.7, 0.22, -0.3),
+    new Vector3(1.7, 0.22, 1.52),
+    new Vector3(1.05, 0.22, 3.35),
+    new Vector3(2.22, 0.22, 5.18),
+    new Vector3(4.15, 0.22, 6.91),
+    new Vector3(4.15, 0.22, 8.62),
   ], false, "centripetal");
   kit.add("career winding pale-stone path", kit.own(pathSurface(curve, 1.28)),
     trailStone);
@@ -77,9 +88,9 @@ export function createCareerTrail(options: CareerTrailOptions = {}): DynamicWorl
 
   const roles = [...portfolioData.experience].reverse();
   roles.forEach((role, index) => {
-    const t = 0.12 + index * 0.108;
-    const point = curve.getPoint(t);
-    const tangent = curve.getTangent(t);
+    const t = 0.06 + index * 0.125;
+    const point = curve.getPointAt(t);
+    const tangent = curve.getTangentAt(t);
     const side = index % 2 === 0 ? 1 : -1;
     const nx = -tangent.z * side;
     const nz = tangent.x * side;
@@ -101,17 +112,26 @@ export function createCareerTrail(options: CareerTrailOptions = {}): DynamicWorl
       [0, 1.45, 0], plinth, 10);
     kit.bevel(`${role.id} authentic mark mount`, [0.47, 0.41, 0.07],
       p.pale, [0, 0.93, 0.21], plinth, 0.025);
+    kit.bevel(`${role.id} return-view mark mount`, [0.47, 0.41, 0.07],
+      p.pale, [0, 0.93, -0.21], plinth, 0.025);
     if (role.logo) kit.image(`${role.company} identity mark`, role.logo,
       0.39, 0.28, [0, 0.94, 0.258], plinth);
     else kit.text(`${role.company} exact-name marker`, [role.company.toUpperCase()],
       0.42, 0.26, [0, 0.94, 0.26], plinth,
       { background: "#e9e4d9", foreground: "#193b49", fontSize: 80 });
+    if (role.logo) kit.image(`${role.company} return-view mark`, role.logo,
+      0.39, 0.28, [0, 0.94, -0.258], plinth).rotation.y = Math.PI;
+    else kit.text(`${role.company} return-view name`, [role.company.toUpperCase()],
+      0.42, 0.26, [0, 0.94, -0.26], plinth,
+      { background: "#e9e4d9", foreground: "#193b49", fontSize: 80 }).rotation.y = Math.PI;
     const number = String(index + 1).padStart(2, "0");
     kit.text(`${role.company} chronology number`, [number], 0.29, 0.21,
       [0, 0.56, 0.275], plinth, { fontSize: 115 });
     interactives.push({ id: `experience:${role.id}`, object: plinth,
       label: `${role.company}: ${role.role}`,
       activate: () => options.onExperienceSelect?.(role.id) });
+    milestonePositions.set(role.id, new Vector3(10 + x, 0, 13 + z));
+    milestoneApproaches.set(role.id, new Vector3(10 + point.x, 0, 13 + point.z));
   });
 
   // Groundcover clusters and small guide lights make this a landscaped route.
@@ -120,6 +140,8 @@ export function createCareerTrail(options: CareerTrailOptions = {}): DynamicWorl
     const radius = 2.75 + (index % 3) * 0.21;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
+    if (Array.from({ length: 31 }, (_, sample) => curve.getPointAt(sample / 30))
+      .some((point) => Math.hypot(x - point.x, z - point.z) < 1.25)) continue;
     kit.cylinder(`career planted bed ${index + 1}`, 0.31, 0.38, 0.12,
       p.stone, [x, 0.22, z], 8);
     kit.cone(`career shrub ${index + 1}`, 0.23, 0.51,
@@ -133,9 +155,11 @@ export function createCareerTrail(options: CareerTrailOptions = {}): DynamicWorl
   return {
     id: "career-trail", group: kit.group,
     entryPoint: new Vector3(7.67, 0, 10.28),
-    cameraComposition: { position: new Vector3(3.9, 5.2, 11.3),
-      target: new Vector3(10, 1.0, 13), durationMs: 1000 },
+    cameraComposition: { position: new Vector3(7.2, 12.1, 25.5),
+      target: new Vector3(11.3, 0.8, 16.3), durationMs: 1050 },
     interactiveObjects: interactives,
+    milestonePositions,
+    milestoneApproaches,
     setReducedMotion(value) { reducedMotion = value; },
     update(delta) {
       if (reducedMotion) return;

@@ -20,6 +20,7 @@ export function createRegulatoryObservatory(
   options: RegulatoryObservatoryOptions = {},
 ): DynamicWorldZone {
   const kit = new ZoneKit("Regulatory Observatory architecture", 13, -1);
+  kit.group.position.y = -0.325;
   const p = makePalette(kit);
   const nucleusMaterial = kit.material("observatory mineral sapphire", 0x1c7e98, 0x3192a9,
     { roughness: 0.2, metalness: 0.26, emissive: 0x087f9e,
@@ -43,8 +44,11 @@ export function createRegulatoryObservatory(
 
   // Tall open bays keep the inner network visible. The dome supplies the map silhouette.
   const columnCount = 12;
+  const westEntrance = (angle: number) => Math.abs(Math.atan2(
+    Math.sin(angle - Math.PI), Math.cos(angle - Math.PI))) < 0.59;
   for (let index = 0; index < columnCount; index += 1) {
     const angle = index * Math.PI * 2 / columnCount;
+    if (westEntrance(angle)) continue;
     const x = Math.cos(angle) * 3.18;
     const z = Math.sin(angle) * 3.18;
     kit.cylinder(`observatory colonnade pier ${index + 1}`, 0.15, 0.2,
@@ -59,7 +63,7 @@ export function createRegulatoryObservatory(
       [Math.cos(next - 0.13) * 3.18, 2.97, Math.sin(next - 0.13) * 3.18],
       [Math.cos(next) * 3.18, 2.55, Math.sin(next) * 3.18],
     ];
-    kit.curve(`observatory stone arch ${index + 1}`, arc, 0.09, p.pale);
+    if (!westEntrance(next)) kit.curve(`observatory stone arch ${index + 1}`, arc, 0.09, p.pale);
   }
   kit.torus("observatory dome stone cornice", 3.25, 0.19, p.pale,
     [0, 2.88, 0]).rotation.x = -Math.PI / 2;
@@ -125,14 +129,14 @@ export function createRegulatoryObservatory(
       label: domain.label, activate: () => options.onDomainSelect?.(domain.id) });
   });
   kit.text("observatory main plaque", ["REGULATORY", "OBSERVATORY"],
-    1.45, 0.52, [-3.28, 1.97, 0]).rotation.y = -Math.PI / 2;
+    1.45, 0.52, [2.4, 1.73, 1.9]).rotation.y = 0.16;
 
   kit.optimizeDrawCalls();
   return {
     id: "observatory", group: kit.group,
     entryPoint: new Vector3(9.55, 0, -1),
-    cameraComposition: { position: new Vector3(7.4, 5.7, 5.4),
-      target: new Vector3(13, 2.7, -1), durationMs: 1000 },
+    cameraComposition: { position: new Vector3(5.0, 3.05, 7.0),
+      target: new Vector3(12.5, 1.5, -1), durationMs: 1000 },
     interactiveObjects: interactives,
     setReducedMotion(value) { reducedMotion = value; },
     update(delta) {

@@ -15,6 +15,7 @@ export interface ContactPortalZone extends DynamicWorldZone {
 /** Luminous completion gateway with physical email and LinkedIn access points. */
 export function createContactPortal(options: ContactPortalOptions = {}): ContactPortalZone {
   const kit = new ZoneKit("Contact Portal architecture", -10, 13);
+  kit.group.position.y = -0.303;
   const p = makePalette(kit);
   const interactives: InteractiveTarget[] = [];
   const links = { email: `mailto:${portfolioData.profile.email}`,
@@ -35,7 +36,7 @@ export function createContactPortal(options: ContactPortalOptions = {}): Contact
 
   const portal = new Group();
   portal.name = "completion gateway";
-  portal.position.set(0, 2.05, 0.22);
+  portal.position.set(0, 2.365, 0.22);
   portal.rotation.y = 2.49;
   kit.group.add(portal);
   // Three independent annular layers and radial apertures create depth through the gateway.
@@ -81,7 +82,7 @@ export function createContactPortal(options: ContactPortalOptions = {}): Contact
   ] as const) {
     const station = new Group();
     station.name = `${label} contact station`;
-    station.position.set(side * 2.35, 0, 1.2);
+    station.position.set(side * 2.35, 0.315, 1.2);
     station.rotation.y = side * -0.18;
     station.userData.action = id;
     kit.group.add(station);

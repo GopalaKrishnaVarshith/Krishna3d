@@ -5,23 +5,23 @@ These images are concept references for a procedurally modeled Three.js world. T
 | Area | Concept evidence | Implementation evidence | Status |
 |---|---|---|---|
 | Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Task 5 round 4 four-view, close-up and motion captures listed below | Visual acceptance still open after round 4 self-audit |
-| Arrival night | `concepts/arrival-night.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-arrival-night.png` | Six landmarks, moon, lit routes and avatar render; cinematic density and full-width landmark framing remain open |
-| Arrival day | `concepts/arrival-day.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-arrival-day.png` | Same geometry switches to sun, pale stone, green planting and blue water; wide-frame fidelity remains open |
-| World topology | `concepts/world-map.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-world-map.png` | Six reachable clearings and five routes, with Contact left and Career right; bridge curvature and landscape density remain open |
-| Evidence Vault | `concepts/evidence-vault.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-evidence-vault.png` | Eleven individually bound capsules, metric mount and open inspection floor render; capsule icon legibility at map distance remains open |
+| Arrival night | `concepts/arrival-night.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-fix-arrival-night.png` | Lab, Vault, Observatory and avatar fit together over lit parapeted routes; still more graphic and less lush than the concept |
+| Arrival day | `concepts/arrival-day.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-fix-arrival-day.png` | Same geometry changes sun/sky/fog, pale stone, vegetation, blue sea and practical intensity before capture |
+| World topology | `concepts/world-map.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-fix-world-map.png` | Six reachable destinations, a distinct south approach, curved protected bridges and a longer eight-stop Career causeway |
+| Evidence Vault | `concepts/evidence-vault.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-fix-vault-entry.png` and `task-7-fix-vault-selected.png` | Eleven bound capsules, readable center and unobstructed entry; selected pod and grounded avatar inspected from inside |
 
 ## World construction inventory
 
 | Element | Modeling interpretation | Fidelity check |
 |---|---|---|
-| Floating campus | Six destination clearings over one continuous-looking sea, joined by walkable straight spans with teal edge lights. Central Arrival Plaza is the hub. | All six zones are visibly separate and directly reachable; the curved bridge silhouette in the concept still needs a terrain/collision change. |
-| Arrival Plaza | Circular pale-stone platform with three brass inlays, shallow step treads, compass markers, off-axis fountain, bridge-side spawn, sculptural sign, lanterns, and planted edges. | Third-person camera sees avatar, traversable floor, and onward routes; the source image's wider parapets and denser gardens are not yet matched. |
+| Floating campus | Six destination clearings over one themed 260-unit sea, five curved protected spokes, a south approach causeway and two extra Career terraces. The central Arrival Plaza remains the hub. | Bridge mesh, parapet and collision projection use the same centerlines; every entry and milestone approach is walkable. |
+| Arrival Plaza | Circular pale-stone platform with three brass inlays, flush step treads, compass markers, off-axis fountain, sculptural sign, lanterns and planted edges; avatar spawns on the south causeway. | Third-person camera shows Lab, Vault, Observatory and avatar together; compass bearings resolve to the actual island positions. |
 | Automation Lab | Rectangular low-poly glazed enclosure with metal frame, two to three visible machine arms and workflow consoles. | Reads as a working space from world-map distance, not a generic box. |
 | Evidence Vault | Circular archive with radial stone floor, structural ribs, one central inspection station and eleven separate perimeter capsules. | Capsules count to **11**; each is selectable and visually distinguishable. |
 | Regulatory Observatory | Ivory drum and domed orbital frame with brass arcs and a central node. | Dome silhouette and orbiting information system remain legible at map distance. |
-| Career Trail | Meandering planted causeway with eight evenly sequenced milestone fixtures. | Trail reads as a journey; eight milestones correspond to content records. |
+| Career Trail | S-shaped pale path crosses three joined right-side terraces with eight distance-spaced, two-sided company fixtures in chronology. | Eight role IDs have distinct positions, walkable approach points and sequential close captures `task-7-fix-career-01.png` through `-08.png`. |
 | Contact Portal | A layered luminous ring gateway on its own terrace, reached by a bridge from the plaza. | Email and LinkedIn world targets carry real links; accessible HTML equivalents belong to the later runtime/UI integration. |
-| Environment | Continuous sea backdrop behind the existing water surface; faceted cliff strata, coastal ridges, moon/stars/clouds, cypress trees, instanced shrubs, sparse cascades, water glints, and shoreline foam. | Repeated detail is batched; integrated 1600 × 900 QA rendered 360 arrival and 488 overview draw calls after reducing small shadow casters. |
+| Environment | One World water plane, faceted coastal slopes/islets, moon/stars/clouds, edge-placed cypress trees, instanced shrubs and cliff strata, sparse cascades, water glints and shoreline foam. | No near/far sea-plane overlap; batched final integrated QA rendered 483 arrival and 577 overview draw calls at 1600 × 900. |
 
 The map is a planning view. The wide arrival view establishes the actual third-person camera language. Distant destinations may be simplified or occluded from a ground camera; navigation and content cannot depend on all landmarks being simultaneously visible.
 
@@ -122,6 +122,8 @@ The final Vault image contains eleven visible perimeter capsules in one radial s
 
 ## Task 7 integrated visual review (2026-09-25)
 
+This section records the first Task 7 pass. The correction round below supersedes its open bridge, Career, floor and camera findings.
+
 The `task-7-*.png` captures above were taken in a temporary Vite/Chrome scaffold with the committed `World`, the actual `Avatar`, and the actual `CameraRig`. The scaffold mounted all six new zone groups and both `ThemeController.bindWorldTerrain(world.group)` and `bindSceneMaterials(world.group)` before rendering. It was removed after capture. The concept images and these renders were inspected directly with `view_image` at 1600 × 900. These are implementation evidence, not concept images placed into the runtime.
 
 | Reference comparison | Finding in first render | Concrete Task 7 correction | Current read |
@@ -135,6 +137,25 @@ The `task-7-*.png` captures above were taken in a temporary Vite/Chrome scaffold
 Opaque static trim is merged within each transform group, while project/capability/milestone/contact target groups and animated objects remain separate. The integrated renderer reported approximately **1,200 arrival draw calls before batching and 360 after**, with 488 in the final overview, 215 in the Vault view and roughly 192,000 arrival triangles. The screenshots prove composition and basic GPU submission counts on one software-rendered Chrome setup; they do not establish mobile frame rate or complete accessibility.
 
 **Task 7 art gate: open.** The world is an authored spatial shell with differentiated places and interactions, but the final captured arrival and map are visibly more sparse and diagrammatic than the five production concepts. Before claiming finished visual fidelity, the runtime integration should stage a more cinematic camera sequence that shows the avatar at useful scale and then reveals both flanking destinations, and the shared terrain should gain curved, parapeted bridge forms and richer planted terraces. The accessible HTML case-study, career and contact interfaces are separate later tasks.
+
+## Task 7 correction review (2026-09-25)
+
+The `task-7-fix-*.png` captures were made from a fresh temporary Vite/Chrome scaffold that instantiated the committed World terrain plus all six zone factories, the actual Avatar, CameraRig and ThemeController. It was removed after capture. The final 1600 × 900 images were inspected with `view_image` against `concepts/arrival-night.png`, `arrival-day.png`, `world-map.png`, and `evidence-vault.png`. The comparison remains an art-direction judgment, not a claim of pixel matching.
+
+| Review finding | Concrete change and evidence | Result |
+|---|---|---|
+| I1 compass reversal | Swapped Career/Contact marker bearings and tested each marker's vector against the registered destination position. | Five markers point toward their actual islands. |
+| I2 buried avatar | Aligned primary walkable floor tops to Y=0 with 0–0.023 unit decorative clearance, lowered the World plaza plateau, and added movement-only boundaries for fixed raised stations. Standing and walking captures exist for all six destinations: `task-7-fix-{stand,walk}-{plaza,automation-lab,evidence-vault,observatory,career-trail,contact-portal}.png`. | Thirty-six-capture browser audit reported every sampled position walkable, and all standing/walking/Vault-selection/milestone foot contacts were between Y=0 and Y=0.0226. Shoes and legs are visible in the reviewed views. |
+| I3 arrival/terrain/Lab | Added a south approach bridge and moved the spawn onto it; World now builds curved ribbons, stone curbs, brass handrails, warm lanterns and teal edges from the same centerlines used by collision projection. Added Career terraces, sloped coastal foothills/islets, edge planting, and stronger Lab masonry, canopy, visible arms, beacons and console materials. | `task-7-fix-arrival-{night,day}.png` shows Lab, Vault, Observatory and avatar together. `task-7-fix-world-map.png` shows the distinct long right-side trail. `task-7-fix-lab.png` shows the workflow through the pavilion. The output is still a deliberately spare low-poly interpretation beside the much denser concepts. |
+| I4 Vault camera/ring | Opened a wider southern arch break, moved the camera back/up, cleared interior trees, separated floor layers to stop depth flicker, and added a selected-pod camera. | `task-7-fix-vault-entry.png` shows a grounded full avatar, center and most capsules; `task-7-fix-vault-selected.png` shows the selected gear pod and full avatar with a Y=0.012 floor contact. The eleven project IDs remain individually bound. |
+| I5 Career length/order | Extended World with two right-side terraces and a continuous S path. Eight role fixtures use distance-spaced points and two-sided marks; the route keeps planting away from the walking ribbon. | `task-7-fix-career-overview.png` shows the longer route. `task-7-fix-career-01.png` through `-08.png` show the chronological stops; unit tests check eight distinct, walkable milestone and approach positions. |
+| I6 camera seam | Captured successive real CameraRig orbit inputs in both directions at follow distance: `task-7-fix-orbit-plus-{38,39,snap44,next45}.png` and `task-7-fix-orbit-minus-{44,snap39,next38}.png`. | Measured camera angles were 38°, 39°, 44°, 45° forward and 44°, 39°, 38° backward. No avatar split was visible at either safe endpoint or adjacent moving sample; the 5° camera jump remains perceptible in the background and the separate close-up Avatar art gate is still open. |
+| M1 motion proof | Added a focused test that freezes, resumes and re-freezes one authored moving object in each of the six zones; the ThemeController test title now describes only its own assertions. | Six zone-motion cases and immediate theme switching have direct test coverage. |
+| M2 water seam | Replaced the two overlapping sea planes with one 260-unit World water surface. Mountain geometry slopes through irregular foothills into the coast; offshore islets interrupt the straight ridge/sea break. | The final night/day pair has one themed water body and a layered coastal horizon. |
+
+Final integrated renderer counts were **483 arrival**, **577 overview**, **233 Vault entry**, **215 Lab**, and **396 Career overview** draw calls; arrival drew about **234,000 triangles**. The browser capture log reports zero page errors and zero console warnings. These counts are bounded QA evidence from one software-rendered Chrome setup, not mobile frame-rate proof.
+
+**Correction status: ready for independent visual rereview.** The structural and movement findings above have concrete fixes and fresh evidence. The reference art remains richer in planting, stone detail and warm night lighting; visual acceptance should be judged against the attached images rather than inferred from test counts. Permanent zone registration and semantic HTML overlays remain later tasks.
 
 ## Review limits
 

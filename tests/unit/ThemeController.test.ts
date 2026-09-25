@@ -67,7 +67,7 @@ describe("ThemeController", () => {
     material.dispose();
   });
 
-  it("switches without animation under reduced motion and freezes world motion", () => {
+  it("switches theme without animation under reduced motion", () => {
     const scene = new Scene();
     const controller = new ThemeController(scene, { reducedMotion: true, storage: memoryStorage() });
     const material = new MeshStandardMaterial();
@@ -92,6 +92,8 @@ describe("ThemeController", () => {
     const water = world.group.getObjectByName("shared water plane") as Mesh;
     const geometry = water.geometry;
     const material = water.material as MeshStandardMaterial;
+    const lantern = world.group.getObjectByName("arrival-approach batched warm lantern heads") as Mesh;
+    const lanternMaterial = lantern.material as MeshStandardMaterial;
     const practical = new PointLight(0xffcc88, 2);
     practical.userData.worldThemeLight = { night: 2, day: 0.1 };
     world.group.add(practical);
@@ -100,11 +102,13 @@ describe("ThemeController", () => {
     controller.bindSceneMaterials(world.group);
 
     expect(material.color.getHex()).toBe(0x0b3150);
+    expect(lanternMaterial.emissiveIntensity).toBeCloseTo(0.94);
     controller.setTheme("day");
     expect(water.geometry).toBe(geometry);
     expect(water.material).toBe(material);
     expect(material.color.getHex()).toBe(0x2878a4);
     expect(practical.intensity).toBe(0.1);
+    expect(lanternMaterial.emissiveIntensity).toBeCloseTo(0.08);
     controller.dispose();
     world.dispose();
   });

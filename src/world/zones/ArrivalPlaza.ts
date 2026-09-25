@@ -11,8 +11,8 @@ const destinations = [
   { id: "automation-lab", angle: Math.PI, label: "Automation Lab" },
   { id: "evidence-vault", angle: -Math.PI / 2, label: "Evidence Vault" },
   { id: "observatory", angle: -0.08, label: "Regulatory Observatory" },
-  { id: "career-trail", angle: 2.2, label: "Career Trail" },
-  { id: "contact-portal", angle: 0.94, label: "Contact Portal" },
+  { id: "career-trail", angle: 0.94, label: "Career Trail" },
+  { id: "contact-portal", angle: 2.2, label: "Contact Portal" },
 ];
 
 /** A navigable compass garden and low fountain, scaled to the existing plaza clearing. */
@@ -58,9 +58,9 @@ export function createArrivalPlaza(options: ArrivalPlazaOptions = {}): DynamicWo
   for (let step = 0; step < 4; step += 1) {
     const width = 3.85 + step * 0.36;
     kit.bevel(`arrival stair tread ${step + 1}`, [width, 0.11, 0.49], p.pale,
-      [0, 0.062 + step * 0.007, 2.17 + step * 0.47], kit.group, 0.035);
+      [0, -0.043, 2.17 + step * 0.47], kit.group, 0.035);
     kit.box(`arrival stair brass nosing ${step + 1}`, [width - 0.14, 0.012, 0.018],
-      p.brass, [0, 0.13 + step * 0.007, 2.41 + step * 0.47]);
+      p.brass, [0, 0.006, 2.41 + step * 0.47]);
   }
 
   // A low, curved identity marker is present without blocking the Vault bridge.
@@ -113,9 +113,9 @@ export function createArrivalPlaza(options: ArrivalPlazaOptions = {}): DynamicWo
   kit.optimizeDrawCalls();
   return {
     id: "plaza", group: kit.group,
-    entryPoint: new Vector3(0, 0, 3.7),
-    cameraComposition: { position: new Vector3(0, 4.8, 9.2),
-      target: new Vector3(0, 1.25, -0.45), durationMs: 950 },
+    entryPoint: new Vector3(0, 0, 7.25),
+    cameraComposition: { position: new Vector3(0, 5.6, 14.7),
+      target: new Vector3(0, 1.35, -2.0), durationMs: 1000 },
     interactiveObjects: interactives,
     setReducedMotion(value) { reducedMotion = value; },
     update(delta) {
