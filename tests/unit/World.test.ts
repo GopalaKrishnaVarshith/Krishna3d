@@ -16,6 +16,19 @@ describe("World navigation shell", () => {
     world.dispose();
   });
 
+  it("places the portal left and career trail right of the arrival bridge", () => {
+    const world = new World();
+    const portal = world.zones.get("contact-portal")!.group.position;
+    const trail = world.zones.get("career-trail")!.group.position;
+    expect(portal.x).toBeLessThan(0);
+    expect(trail.x).toBeGreaterThan(0);
+    for (const id of ["contact-portal", "career-trail"]) {
+      const point = world.zones.get(id)!.entryPoint;
+      expect(world.isWalkable(point.x, point.z, 0.34)).toBe(true);
+    }
+    world.dispose();
+  });
+
   it("projects attempts beyond the island edge back to a walkable surface", () => {
     const world = new World();
     const safe = world.constrainPosition(new Vector3(30, -8, 30));

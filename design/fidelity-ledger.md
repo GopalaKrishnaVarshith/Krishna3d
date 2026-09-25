@@ -5,23 +5,23 @@ These images are concept references for a procedurally modeled Three.js world. T
 | Area | Concept evidence | Implementation evidence | Status |
 |---|---|---|---|
 | Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Task 5 round 4 four-view, close-up and motion captures listed below | Visual acceptance still open after round 4 self-audit |
-| Arrival night | `concepts/arrival-night.png` | Added during Task 7 | Awaiting Task 7 review |
-| Arrival day | `concepts/arrival-day.png` | Added during Task 7 | Awaiting Task 7 review |
-| World topology | `concepts/world-map.png` | Added during Task 7 | Awaiting Task 7 review |
-| Evidence Vault | `concepts/evidence-vault.png` | Added during Task 7 | Awaiting Task 7 review |
+| Arrival night | `concepts/arrival-night.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-arrival-night.png` | Six landmarks, moon, lit routes and avatar render; cinematic density and full-width landmark framing remain open |
+| Arrival day | `concepts/arrival-day.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-arrival-day.png` | Same geometry switches to sun, pale stone, green planting and blue water; wide-frame fidelity remains open |
+| World topology | `concepts/world-map.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-world-map.png` | Six reachable clearings and five routes, with Contact left and Career right; bridge curvature and landscape density remain open |
+| Evidence Vault | `concepts/evidence-vault.png` | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-7-evidence-vault.png` | Eleven individually bound capsules, metric mount and open inspection floor render; capsule icon legibility at map distance remains open |
 
 ## World construction inventory
 
 | Element | Modeling interpretation | Fidelity check |
 |---|---|---|
-| Floating campus | Six destination islands/terraces over one water plane, joined by walkable curved bridges. Central Arrival Plaza is the hub. | All six zones are visibly separate and directly reachable. No detached decorative destination. |
-| Arrival Plaza | Circular pale-stone platform with three concentric brass inlays, wide steps, low parapets, a bridge-side spawn, and planted edges. | Third-person camera sees avatar, traversable floor, and at least one onward route. |
+| Floating campus | Six destination clearings over one continuous-looking sea, joined by walkable straight spans with teal edge lights. Central Arrival Plaza is the hub. | All six zones are visibly separate and directly reachable; the curved bridge silhouette in the concept still needs a terrain/collision change. |
+| Arrival Plaza | Circular pale-stone platform with three brass inlays, shallow step treads, compass markers, off-axis fountain, bridge-side spawn, sculptural sign, lanterns, and planted edges. | Third-person camera sees avatar, traversable floor, and onward routes; the source image's wider parapets and denser gardens are not yet matched. |
 | Automation Lab | Rectangular low-poly glazed enclosure with metal frame, two to three visible machine arms and workflow consoles. | Reads as a working space from world-map distance, not a generic box. |
 | Evidence Vault | Circular archive with radial stone floor, structural ribs, one central inspection station and eleven separate perimeter capsules. | Capsules count to **11**; each is selectable and visually distinguishable. |
 | Regulatory Observatory | Ivory drum and domed orbital frame with brass arcs and a central node. | Dome silhouette and orbiting information system remain legible at map distance. |
 | Career Trail | Meandering planted causeway with eight evenly sequenced milestone fixtures. | Trail reads as a journey; eight milestones correspond to content records. |
-| Contact Portal | A luminous ring gateway on its own terrace, reached by a bridge from the plaza. | Email and LinkedIn remain real accessible HTML actions. |
-| Environment | One shared deep-blue water plane, terraced beveled rock, mineral-green ground patches, cypress-like instanced trees, shrubs, and sparse waterfalls or shoreline foam. | Detail is selectively repeated and batched so the initial scene remains within performance goals. |
+| Contact Portal | A layered luminous ring gateway on its own terrace, reached by a bridge from the plaza. | Email and LinkedIn world targets carry real links; accessible HTML equivalents belong to the later runtime/UI integration. |
+| Environment | Continuous sea backdrop behind the existing water surface; faceted cliff strata, coastal ridges, moon/stars/clouds, cypress trees, instanced shrubs, sparse cascades, water glints, and shoreline foam. | Repeated detail is batched; integrated 1600 × 900 QA rendered 360 arrival and 488 overview draw calls after reducing small shadow casters. |
 
 The map is a planning view. The wide arrival view establishes the actual third-person camera language. Distant destinations may be simplified or occluded from a ground camera; navigation and content cannot depend on all landmarks being simultaneously visible.
 
@@ -119,6 +119,22 @@ The two arrival concepts were made from one camera and geometry: bridge-side cam
 ## Evidence Vault inventory
 
 The final Vault image contains eleven visible perimeter capsules in one radial sequence: shield, data cubes, gear, graduation cap, heart/pulse, document, people, balance scales, orbital ring, network nodes and routing arrows. These motifs are visual placeholders for the eleven approved public-safe case studies; bind each to a specific case-study record during implementation rather than inferring a confidential project name from the image. The central station has an inspectable project object and a compact metric hologram of bars/rings/dots. Keep the chamber walkable and the readable case-study interface in semantic HTML.
+
+## Task 7 integrated visual review (2026-09-25)
+
+The `task-7-*.png` captures above were taken in a temporary Vite/Chrome scaffold with the committed `World`, the actual `Avatar`, and the actual `CameraRig`. The scaffold mounted all six new zone groups and both `ThemeController.bindWorldTerrain(world.group)` and `bindSceneMaterials(world.group)` before rendering. It was removed after capture. The concept images and these renders were inspected directly with `view_image` at 1600 × 900. These are implementation evidence, not concept images placed into the runtime.
+
+| Reference comparison | Finding in first render | Concrete Task 7 correction | Current read |
+|---|---|---|---|
+| Night/day arrival | A flat sky and hard water horizon left the plaza looking isolated; the centered fountain obscured the Vault approach. | Added faceted coastal ridges, sparse stars/clouds and a night-only moon; extended the sea, batched shoreline glints, shrubs and cliff strata; moved and reduced the fountain to keep the centerline open. | The same modeled scene changes sky, fog, sun/moon/ambient/practical lights, sea, stone, planting and emission. Lab and Observatory are still clipped at the edges of the 69° bridge-side capture, and the avatar is smaller than in the concept. |
+| World map | The two foreground destinations were reversed, and the clearings lacked edge definition. | Swapped Career and Contact positions in `World.ts` and aligned both factories; added teal rails, low planted edges, stone strata and waterline marks. | All six silhouettes and five routes are distinct and reachable. Bridges remain straight rather than curved; the circular Career clearing compresses the eight stops compared with the long concept trail. |
+| Evidence Vault | A complete front cornice crossed the character and inspection station; capsules read as empty pedestals. | Interrupted the entry cornice, lowered the inspection camera, moved the title plaque aside, added capsule glazing struts and distinct project motifs. | Eleven perimeter capsule groups map to eleven public case-study IDs. Front columns still occlude two side capsules from this single entry camera; later interaction shots should move closer to a selected pod. |
+| Day/night practicals | Pale emissive pieces washed out as white in the first pass. | Reduced generic teal emission and gave the fountain, metric crystal and observatory nucleus separate mineral-blue materials. | Brighter bars remain readable at night without changing geometry. The daylight scene is still flatter and less landscaped than the rendered target. |
+| Follow camera seam | The known avatar view wipe was exposed in earlier Task 5 close orbit work. | Used the committed CameraRig in the integrated scene and captured `task-7-avatar-arrival.png`, `task-7-avatar-orbit-38.png`, `task-7-avatar-orbit-42.png` and `task-7-avatar-orbit-45.png`. | A requested 42° orbit rendered at 44°; no view split is visible at normal follow distance in these samples. This does not clear the separate close-up avatar art gate. |
+
+Opaque static trim is merged within each transform group, while project/capability/milestone/contact target groups and animated objects remain separate. The integrated renderer reported approximately **1,200 arrival draw calls before batching and 360 after**, with 488 in the final overview, 215 in the Vault view and roughly 192,000 arrival triangles. The screenshots prove composition and basic GPU submission counts on one software-rendered Chrome setup; they do not establish mobile frame rate or complete accessibility.
+
+**Task 7 art gate: open.** The world is an authored spatial shell with differentiated places and interactions, but the final captured arrival and map are visibly more sparse and diagrammatic than the five production concepts. Before claiming finished visual fidelity, the runtime integration should stage a more cinematic camera sequence that shows the avatar at useful scale and then reveals both flanking destinations, and the shared terrain should gain curved, parapeted bridge forms and richer planted terraces. The accessible HTML case-study, career and contact interfaces are separate later tasks.
 
 ## Review limits
 

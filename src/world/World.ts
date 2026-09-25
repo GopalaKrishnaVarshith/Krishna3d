@@ -12,8 +12,8 @@ const ISLANDS: Island[] = [
   { id: "automation-lab", x: -13, z: 0, radius: 4.5 },
   { id: "evidence-vault", x: 0, z: -14, radius: 4.6 },
   { id: "observatory", x: 13, z: -1, radius: 4.4 },
-  { id: "career-trail", x: -10, z: 13, radius: 4.3 },
-  { id: "contact-portal", x: 10, z: 13, radius: 4.1 },
+  { id: "career-trail", x: 10, z: 13, radius: 4.3 },
+  { id: "contact-portal", x: -10, z: 13, radius: 4.1 },
 ];
 const BRIDGE_HALF_WIDTH = 1.35;
 const SURFACE_Y = 0;
