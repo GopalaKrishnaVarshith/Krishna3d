@@ -76,7 +76,7 @@ export class InteractionSystem {
   focus(id: string): boolean {
     if (this.options.overlayOpen?.()) { this.select(null); return false; }
     const target = this.targets.get(id);
-    if (!target) return false;
+    if (!target) { this.select(null); return false; }
     this.select(target);
     return true;
   }

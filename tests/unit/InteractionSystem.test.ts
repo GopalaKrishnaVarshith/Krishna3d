@@ -1,4 +1,4 @@
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3 } from "three";
+import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Vector3 } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { EventBus } from "../../src/core/EventBus";
 import { InteractionSystem, type InteractionEvents } from "../../src/interaction/InteractionSystem";
@@ -48,6 +48,17 @@ describe("InteractionSystem", () => {
     expect(item.activate).toHaveBeenCalledOnce();
   });
 
+  it("clears a prior action when direct focus cannot resolve an ID", () => {
+    const system = new InteractionSystem({ camera: new PerspectiveCamera() });
+    const item = target("project:known", -4);
+    system.register(item);
+    expect(system.focus(item.id)).toBe(true);
+    expect(system.focus("project:missing")).toBe(false);
+    expect(system.current).toBeNull();
+    expect(system.activate()).toBe(false);
+    expect(item.activate).not.toHaveBeenCalled();
+  });
+
   it("suppresses pointer, focus, and activation while an overlay is open", () => {
     let overlay = false;
     const system = new InteractionSystem({ camera: new PerspectiveCamera(), overlayOpen: () => overlay });
@@ -65,16 +76,25 @@ describe("InteractionSystem", () => {
 describe("ProjectVault", () => {
   it("resolves and opens every published project through the matching capsule", () => {
     const canvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(),
+      fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(), clearRect: vi.fn(),
     } as unknown as CanvasRenderingContext2D);
     const zone = createEvidenceVault({ reducedMotion: true });
     const vault = new ProjectVault(zone);
     expect(vault.capsules.size).toBe(11);
+    const silhouettes = new Set<string>();
     for (const project of portfolioData.projects) {
       expect(vault.capsules.get(project.id)).toBeDefined();
+      const capsule = vault.capsules.get(project.id)!;
+      const body = capsule.getObjectByName(`${project.id} category capsule body`);
+      expect(body).toBeInstanceOf(Mesh);
+      expect((body as Mesh).geometry).toBeInstanceOf(CylinderGeometry);
+      const geometry = (body as Mesh<CylinderGeometry>).geometry;
+      silhouettes.add(JSON.stringify(geometry.parameters));
+      expect(capsule.getObjectByName(`${project.id} glass housing`)?.visible).toBe(false);
       expect(vault.open(project.id)).toEqual(project);
       expect(vault.activeProject?.id).toBe(project.id);
     }
+    expect(silhouettes.size).toBe(new Set(portfolioData.projects.map((project) => project.category)).size);
     expect(vault.open("missing-project")).toBeNull();
     vault.update(1 / 60, new Vector3());
     vault.dispose();
@@ -84,7 +104,7 @@ describe("ProjectVault", () => {
 
   it("removes decorative bars when a bound project has no published metric", () => {
     const canvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(),
+      fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(), clearRect: vi.fn(),
     } as unknown as CanvasRenderingContext2D);
     const zone = createEvidenceVault({ reducedMotion: true });
     const metrics = new MetricVisualization();

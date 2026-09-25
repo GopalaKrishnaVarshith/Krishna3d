@@ -1,6 +1,6 @@
 import {
-  BufferGeometry, CylinderGeometry, Group, Material, Mesh,
-  MeshBasicMaterial, RingGeometry, TorusGeometry,
+  BufferGeometry, CanvasTexture, CylinderGeometry, Group, Material, Mesh,
+  MeshBasicMaterial, RingGeometry, Sprite, SpriteMaterial, SRGBColorSpace, Texture, TorusGeometry,
 } from "three";
 import type { Metric } from "../data/types";
 
@@ -32,6 +32,7 @@ export class MetricVisualization {
   metrics: ParsedMetric[] = [];
   private readonly geometries = new Set<BufferGeometry>();
   private readonly materials = new Set<Material>();
+  private readonly textures = new Set<Texture>();
   private elapsed = 0;
 
   constructor() { this.group.name = "published project metrics"; }
@@ -41,15 +42,17 @@ export class MetricVisualization {
     this.metrics = metrics.map(parseMetric).filter((metric): metric is ParsedMetric => metric !== null);
     this.group.userData.metricLabels = this.metrics.map(({ label, display }) => `${label}: ${display}`);
     this.metrics.forEach((metric, index) => {
-      const x = (index - (this.metrics.length - 1) / 2) * 0.65;
+      const x = (index - (this.metrics.length - 1) / 2) * 1.15;
       const station = new Group();
       station.name = `${metric.label} ${metric.display}`;
       station.position.x = x;
       station.userData.metric = metric;
       this.group.add(station);
       if (metric.kind === "percent") this.percent(station, metric);
-      else if (metric.number <= 5 && !metric.lowerBound) this.markers(station, metric);
+      else if (Number.isInteger(metric.number) && metric.number <= 5 && !metric.lowerBound)
+        this.markers(station, metric);
       else this.column(station, metric);
+      this.label(station, metric);
     });
     // A radial comparison is meaningful only for measures with the same label and unit.
     if (this.metrics.length > 1 && this.metrics.every((metric) =>
@@ -107,6 +110,34 @@ export class MetricVisualization {
     station.add(column);
   }
 
+  private label(station: Group, metric: ParsedMetric): void {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 192;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.textAlign = "center";
+    context.fillStyle = "#f9dfab";
+    context.font = "bold 68px Arial";
+    context.fillText(metric.display, 256, 78, 470);
+    context.fillStyle = "#d2f1f1";
+    context.font = "25px Arial";
+    context.fillText(metric.label, 256, 136, 470);
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    this.textures.add(texture);
+    const material = new SpriteMaterial({ map: texture, transparent: true,
+      depthWrite: false, depthTest: false });
+    this.materials.add(material);
+    const sprite = new Sprite(material);
+    sprite.name = `${metric.label}: ${metric.display} visible label`;
+    sprite.userData.display = metric.display;
+    sprite.position.y = -0.53;
+    sprite.scale.set(1.08, 0.405, 1);
+    station.add(sprite);
+  }
+
   private geometry<T extends BufferGeometry>(geometry: T): T { this.geometries.add(geometry); return geometry; }
   private material(color: number): MeshBasicMaterial {
     const material = new MeshBasicMaterial({ color, side: 2 });
@@ -117,7 +148,8 @@ export class MetricVisualization {
     this.group.clear();
     for (const item of this.geometries) item.dispose();
     for (const item of this.materials) item.dispose();
-    this.geometries.clear(); this.materials.clear();
+    for (const item of this.textures) item.dispose();
+    this.geometries.clear(); this.materials.clear(); this.textures.clear();
     this.metrics = [];
     this.group.userData.metricLabels = [];
   }

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { CanvasTexture, Sprite } from "three";
+import { describe, expect, it, vi } from "vitest";
 import { MetricVisualization, parseMetric } from "../../src/world/MetricVisualization";
 import { portfolioData } from "../../src/data/portfolioData";
 
@@ -23,13 +24,37 @@ describe("metric parsing", () => {
   });
 
   it("shows only sourced values and clears visuals for a project without metrics", () => {
+    const fillText = vi.fn();
+    const canvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      clearRect: vi.fn(), fillText,
+    } as unknown as CanvasRenderingContext2D);
     const visual = new MetricVisualization();
     const measured = portfolioData.projects.flatMap((project) => project.metrics);
     visual.setMetrics(measured);
     expect(visual.metrics.map(({ display }) => display)).toEqual(measured.map(({ value }) => value));
+    const labels = visual.group.children.map((station) =>
+      station.children.find((child) => child instanceof Sprite));
+    expect(labels.every((label) => label instanceof Sprite)).toBe(true);
+    expect(labels.every((label) => (label as Sprite).material.map instanceof CanvasTexture)).toBe(true);
+    for (const value of ["Approx. 99%", "200+", "230+", "15+", "2"])
+      expect(fillText).toHaveBeenCalledWith(value, expect.any(Number), expect.any(Number), expect.any(Number));
     expect(visual.group.children.length).toBeGreaterThan(0);
     visual.setMetrics([]);
     expect(visual.group.children).toHaveLength(0);
     visual.dispose();
+    canvas.mockRestore();
+  });
+
+  it("uses proportional geometry instead of counted markers for a fractional count", () => {
+    const canvas = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      clearRect: vi.fn(), fillText: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    const visual = new MetricVisualization();
+    visual.setMetrics([{ label: "Example", value: "2.5" }]);
+    expect(visual.metrics[0].number).toBe(2.5);
+    const station = visual.group.children[0];
+    expect(station.children.some((child) => child.name.includes("counted marker"))).toBe(false);
+    expect(station.children.some((child) => child.name.includes("rising column"))).toBe(true);
+    visual.dispose(); canvas.mockRestore();
   });
 });
