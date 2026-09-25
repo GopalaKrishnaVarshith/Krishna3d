@@ -1,10 +1,14 @@
 import { Group, OctahedronGeometry, Vector3 } from "three";
-import type { InteractiveTarget } from "../types";
+import type { CameraComposition, InteractiveTarget } from "../types";
 import { buildAtmosphere } from "./Atmosphere";
 import { makePalette, type DynamicWorldZone, type ZoneOptions, ZoneKit } from "./zoneKit";
 
 export interface ArrivalPlazaOptions extends ZoneOptions {
   onNavigate?: (zoneId: string) => void;
+}
+
+export interface ArrivalPlazaZone extends DynamicWorldZone {
+  readonly heroComposition: CameraComposition;
 }
 
 const destinations = [
@@ -16,7 +20,7 @@ const destinations = [
 ];
 
 /** A navigable compass garden and low fountain, scaled to the existing plaza clearing. */
-export function createArrivalPlaza(options: ArrivalPlazaOptions = {}): DynamicWorldZone {
+export function createArrivalPlaza(options: ArrivalPlazaOptions = {}): ArrivalPlazaZone {
   const kit = new ZoneKit("Arrival Plaza architecture", 0, 0);
   const p = makePalette(kit);
   const crystal = kit.material("arrival sea-glass crystal", 0x1d7897, 0x398da2,
@@ -113,9 +117,11 @@ export function createArrivalPlaza(options: ArrivalPlazaOptions = {}): DynamicWo
   kit.optimizeDrawCalls();
   return {
     id: "plaza", group: kit.group,
-    entryPoint: new Vector3(0, 0, 7.25),
-    cameraComposition: { position: new Vector3(0, 5.6, 14.7),
-      target: new Vector3(0, 1.35, -2.0), durationMs: 1000 },
+    entryPoint: new Vector3(0, 0, 9.2),
+    cameraComposition: { position: new Vector3(0, 6.8, 14.3),
+      target: new Vector3(0, -0.5, -1.6), durationMs: 1000, fov: 74 },
+    heroComposition: { position: new Vector3(0, 4.5, 13.2),
+      target: new Vector3(0, 0, 1), durationMs: 850, fov: 60 },
     interactiveObjects: interactives,
     setReducedMotion(value) { reducedMotion = value; },
     update(delta) {

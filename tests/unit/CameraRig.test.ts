@@ -14,6 +14,29 @@ describe("CameraRig", () => {
     expect(rig.isTransitioning).toBe(false);
   });
 
+  it("honors optional authored FOV while preserving the current FOV when omitted", () => {
+    const camera = new PerspectiveCamera(55);
+    const rig = new CameraRig(camera, { reducedMotion: true });
+    rig.snapTo(new Vector3());
+    rig.transitionTo({ position: new Vector3(0, 5, 8), target: new Vector3(),
+      durationMs: 500, fov: 70 });
+    expect(camera.fov).toBe(70);
+    rig.transitionTo({ position: new Vector3(0, 5, 7), target: new Vector3(),
+      durationMs: 500 });
+    expect(camera.fov).toBe(70);
+
+    const animatedCamera = new PerspectiveCamera(55);
+    const animatedRig = new CameraRig(animatedCamera);
+    animatedRig.snapTo(new Vector3());
+    animatedRig.transitionTo({ position: new Vector3(0, 5, 8), target: new Vector3(),
+      durationMs: 1000, fov: 75 });
+    animatedRig.follow(new Vector3(), 0.5);
+    expect(animatedCamera.fov).toBeGreaterThan(55);
+    expect(animatedCamera.fov).toBeLessThan(75);
+    animatedRig.skipTransition();
+    expect(animatedCamera.fov).toBe(75);
+  });
+
   it("never renders in the known 40 to 42 degree avatar seam during orbit", () => {
     const camera = new PerspectiveCamera();
     const rig = new CameraRig(camera);

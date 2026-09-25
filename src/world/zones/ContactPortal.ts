@@ -114,7 +114,7 @@ export function createContactPortal(options: ContactPortalOptions = {}): Contact
     id: "contact-portal", group: kit.group,
     entryPoint: new Vector3(-7.66, 0, 9.93),
     cameraComposition: { position: new Vector3(-5.8, 5.3, 7.6),
-      target: new Vector3(-10, 2.1, 13.1), durationMs: 1100 },
+      target: new Vector3(-10, 2.1, 13.1), durationMs: 1100, fov: 55 },
     interactiveObjects: interactives,
     links,
     setReducedMotion(value) { reducedMotion = value; },

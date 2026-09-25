@@ -97,7 +97,8 @@ function symbol(kit: ZoneKit, parent: Group, index: number, p: ReturnType<typeof
 /** A walkable radial archive with exactly eleven data-bound project capsules. */
 export function createEvidenceVault(options: EvidenceVaultOptions = {}): EvidenceVaultZone {
   const kit = new ZoneKit("Evidence Vault architecture", 0, -14);
-  kit.group.position.y = -0.3;
+  kit.group.scale.y = 1.18;
+  kit.group.position.y = -0.354;
   const p = makePalette(kit);
   const crystalMaterial = kit.material("evidence sapphire", 0x19758f, 0x318ca4,
     { roughness: 0.22, metalness: 0.26, emissive: 0x087993,
@@ -188,32 +189,53 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
       p.stone, [0, 0.45, 0], 14, capsule);
     kit.cylinder(`${project.id} base collar`, 0.5, 0.5, 0.075,
       p.brass, [0, 0.67, 0], 14, capsule);
-    kit.cylinder(`${project.id} glass housing`, 0.34, 0.34, 0.82,
-      p.glass, [0, 1.12, 0], 16, capsule);
+    kit.cylinder(`${project.id} glass housing`, 0.34, 0.34, 1.26,
+      p.glass, [0, 1.34, 0], 16, capsule);
     kit.torus(`${project.id} capsule glowing foot`, 0.35, 0.025,
       p.tealLight, [0, 0.72, 0], capsule).rotation.x = -Math.PI / 2;
     kit.cylinder(`${project.id} capsule cap`, 0.41, 0.36, 0.105,
-      p.brass, [0, 1.59, 0], 14, capsule);
+      p.brass, [0, 2.03, 0], 14, capsule);
     for (let strut = 0; strut < 4; strut += 1) {
       const angle = strut * Math.PI / 2 + Math.PI / 4;
       const x = Math.cos(angle) * 0.34;
       const z = Math.sin(angle) * 0.34;
       kit.beam(`${project.id} capsule brass glazing strut ${strut + 1}`,
-        [x, 0.74, z], [x, 1.58, z], 0.012, p.brass, capsule);
+        [x, 0.74, z], [x, 2.02, z], 0.012, p.brass, capsule);
     }
     kit.sphere(`${project.id} capsule lamp`, 0.065, p.goldLight,
-      [0, 1.68, 0], capsule, 8);
+      [0, 2.13, 0], capsule, 8);
     kit.text(`${project.number} capsule number`, [project.number], 0.28, 0.28,
       [0, 0.43, 0.515], capsule, { fontSize: 175 });
     const glyph = new Group();
     glyph.name = `${project.title} icon`;
-    glyph.position.set(0, 1.16, 0.05);
+    glyph.position.set(0, 1.47, 0.05);
     capsule.add(glyph);
     symbol(kit, glyph, index, p);
+    if (index > 0 && index < 10) {
+      const towerRadius = 3.78;
+      const tx = Math.cos(angle) * towerRadius;
+      const tz = Math.sin(angle) * towerRadius;
+      kit.cylinder(`${project.id} high archive backing`, 0.28, 0.42, 2.55,
+        p.stone, [tx, 1.48, tz], 10);
+      const faceX = tx - Math.cos(angle) * 0.33;
+      const faceZ = tz - Math.sin(angle) * 0.33;
+      const backing = kit.bevel(`${project.id} archive vertical enamel`,
+        [0.41, 1.63, 0.055], p.deep, [faceX, 1.58, faceZ], kit.group, 0.025);
+      backing.rotation.y = Math.atan2(-tx, -tz);
+      const glow = kit.bevel(`${project.id} archive warm vertical inset`,
+        [0.15, 1.3, 0.035], p.goldLight,
+        [faceX - Math.cos(angle) * 0.05, 1.58, faceZ - Math.sin(angle) * 0.05],
+        kit.group, 0.012);
+      glow.rotation.y = backing.rotation.y;
+      kit.cylinder(`${project.id} high archive crown`, 0.36, 0.42, 0.16,
+        p.brass, [tx, 2.84, tz], 10);
+      kit.sphere(`${project.id} high archive warm crown lamp`, 0.075,
+        p.goldLight, [tx, 3.0, tz], kit.group, 8);
+    }
     interactives.push({ id: `project:${project.id}`, object: capsule,
       label: project.title, activate: () => options.onProjectSelect?.(project.id) });
     capsulePositions.set(project.id, new Vector3(x, 0, z - 14));
-    cameraPoints.set(project.id, new Vector3(x * 0.53, 2.02, z * 0.53 - 14));
+    cameraPoints.set(project.id, new Vector3(x * 0.53, 2.35, z * 0.53 - 14));
   });
 
   // The central inspection station is intentionally low so capsule icons remain in view.
@@ -223,6 +245,10 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
     p.brass, [0, 0.7, 0], 24);
   kit.cylinder("vault central translucent lens", 0.78, 0.78, 0.05,
     p.glass, [0, 0.76, 0], 24);
+  kit.cylinder("vault central glazed inspection sleeve", 0.78, 0.78, 1.68,
+    p.glass, [0, 1.56, 0], 24);
+  kit.torus("vault central brass inspection crown", 0.8, 0.045,
+    p.brass, [0, 2.41, 0]).rotation.x = -Math.PI / 2;
   for (const radius of [0.48, 0.75])
     kit.torus(`vault central hologram orbit ${radius}`, radius, 0.018,
       p.tealLight, [0, 0.81, 0]).rotation.x = -Math.PI / 2;
@@ -237,7 +263,7 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
       [-0.38 + index * 0.19, height / 2, 0], metricMount, 0.015);
   }
   const crystal = kit.add("vault inspectable evidence prism",
-    kit.own(new OctahedronGeometry(0.33)), crystalMaterial, [0, 1.29, 0], metricMount);
+    kit.own(new OctahedronGeometry(0.46)), crystalMaterial, [0, 1.29, 0], metricMount);
   crystal.rotation.z = 0.2;
   kit.text("vault archive title", ["EVIDENCE", "VAULT"], 1.18, 0.42,
     [-3.32, 2.12, 2.34]).rotation.y = -0.88;
@@ -246,8 +272,8 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
   return {
     id: "evidence-vault", group: kit.group,
     entryPoint: new Vector3(0, 0, -10.58),
-    cameraComposition: { position: new Vector3(0, 4.25, -6.5),
-      target: new Vector3(0, 1.38, -14), durationMs: 1050 },
+    cameraComposition: { position: new Vector3(0, 4.7, -6.5),
+      target: new Vector3(0, 1.64, -14), durationMs: 1050, fov: 60 },
     interactiveObjects: interactives,
     capsulePositions, cameraPoints, metricMount,
     inspectionPoint: new Vector3(0, 0, -12.7),

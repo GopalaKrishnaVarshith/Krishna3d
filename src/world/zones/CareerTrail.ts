@@ -1,6 +1,6 @@
 import { BufferGeometry, CatmullRomCurve3, Float32BufferAttribute, Group, Vector3 } from "three";
 import { portfolioData } from "../../data/portfolioData";
-import type { InteractiveTarget } from "../types";
+import type { CameraComposition, InteractiveTarget } from "../types";
 import { makePalette, type DynamicWorldZone, type ZoneOptions, ZoneKit } from "./zoneKit";
 
 export interface CareerTrailOptions extends ZoneOptions {
@@ -10,6 +10,20 @@ export interface CareerTrailOptions extends ZoneOptions {
 export interface CareerTrailZone extends DynamicWorldZone {
   readonly milestonePositions: Map<string, Vector3>;
   readonly milestoneApproaches: Map<string, Vector3>;
+  readonly milestoneViewingPoints: Map<string, Vector3>;
+  readonly milestoneCameras: Map<string, CameraComposition>;
+}
+
+function roleLines(role: string): string[] {
+  const words = role.replace(/\s*\|\s*/g, " ").split(/\s+/);
+  const lines: string[] = [];
+  for (const word of words) {
+    const current = lines.length - 1;
+    if (current < 0 || (lines[current].length + word.length + 1 > 21 && lines.length < 3))
+      lines.push(word);
+    else lines[current] += ` ${word}`;
+  }
+  return lines;
 }
 
 function pathSurface(curve: CatmullRomCurve3, width: number): BufferGeometry {
@@ -48,6 +62,8 @@ export function createCareerTrail(options: CareerTrailOptions = {}): CareerTrail
   const interactives: InteractiveTarget[] = [];
   const milestonePositions = new Map<string, Vector3>();
   const milestoneApproaches = new Map<string, Vector3>();
+  const milestoneViewingPoints = new Map<string, Vector3>();
+  const milestoneCameras = new Map<string, CameraComposition>();
   let reducedMotion = options.reducedMotion ?? false;
   let elapsed = 0;
   kit.lamp("career trail guidance pool", 0xffd6a5, 2.1, 0.1, 8, [0, 3, 0]);
@@ -94,45 +110,96 @@ export function createCareerTrail(options: CareerTrailOptions = {}): CareerTrail
     const side = index % 2 === 0 ? 1 : -1;
     const nx = -tangent.z * side;
     const nz = tangent.x * side;
-    const x = point.x + nx * 0.9;
-    const z = point.z + nz * 0.9;
+    const x = point.x + nx * 1.28;
+    const z = point.z + nz * 1.28;
     const plinth = new Group();
     plinth.name = `${role.company} career milestone`;
     plinth.position.set(x, 0, z);
     plinth.rotation.y = Math.atan2(-nx, -nz);
     plinth.userData.experienceId = role.id;
     kit.group.add(plinth);
-    kit.cylinder(`${role.id} footing`, 0.37, 0.45, 0.15, p.stone,
-      [0, 0.3, 0], 10, plinth);
-    kit.cylinder(`${role.id} carved tapered marker`, 0.22, 0.33, 0.88,
-      p.dark, [0, 0.81, 0], 8, plinth);
-    kit.cylinder(`${role.id} marker brass cap`, 0.28, 0.28, 0.07,
-      p.brass, [0, 1.3, 0], 10, plinth);
-    kit.sphere(`${role.id} time beacon`, 0.115, p.goldLight,
-      [0, 1.45, 0], plinth, 10);
-    kit.bevel(`${role.id} authentic mark mount`, [0.47, 0.41, 0.07],
-      p.pale, [0, 0.93, 0.21], plinth, 0.025);
-    kit.bevel(`${role.id} return-view mark mount`, [0.47, 0.41, 0.07],
-      p.pale, [0, 0.93, -0.21], plinth, 0.025);
-    if (role.logo) kit.image(`${role.company} identity mark`, role.logo,
-      0.39, 0.28, [0, 0.94, 0.258], plinth);
-    else kit.text(`${role.company} exact-name marker`, [role.company.toUpperCase()],
-      0.42, 0.26, [0, 0.94, 0.26], plinth,
-      { background: "#e9e4d9", foreground: "#193b49", fontSize: 80 });
-    if (role.logo) kit.image(`${role.company} return-view mark`, role.logo,
-      0.39, 0.28, [0, 0.94, -0.258], plinth).rotation.y = Math.PI;
-    else kit.text(`${role.company} return-view name`, [role.company.toUpperCase()],
-      0.42, 0.26, [0, 0.94, -0.26], plinth,
-      { background: "#e9e4d9", foreground: "#193b49", fontSize: 80 }).rotation.y = Math.PI;
+    kit.cylinder(`${role.id} footing`, 0.55, 0.63, 0.18, p.stone,
+      [0, 0.3, 0], 12, plinth);
+    kit.bevel(`${role.id} framed information spine`, [1.26, 1.7, 0.21],
+      p.dark, [0, 1.28, 0], plinth, 0.06);
+    kit.cylinder(`${role.id} marker brass cap`, 0.43, 0.43, 0.07,
+      p.brass, [0, 2.18, 0], 12, plinth);
+    kit.sphere(`${role.id} time beacon`, 0.13, p.goldLight,
+      [0.46, 2.33, 0], plinth, 10);
     const number = String(index + 1).padStart(2, "0");
-    kit.text(`${role.company} chronology number`, [number], 0.29, 0.21,
-      [0, 0.56, 0.275], plinth, { fontSize: 115 });
+    for (const sideName of ["arrival", "return"] as const) {
+      const face = new Group();
+      face.name = `${role.company} ${sideName} information face`;
+      face.position.z = sideName === "arrival" ? 0.118 : -0.118;
+      face.rotation.y = sideName === "arrival" ? 0 : Math.PI;
+      plinth.add(face);
+      kit.text(`${role.company} ${sideName} chronology number`, [number], 0.76, 0.32,
+        [0, 2.01, 0.015], face,
+        { background: "#153d4d", foreground: "#ffe3a6", accent: "#c8a665", fontSize: 171 });
+      kit.text(`${role.company} ${sideName} company name`, [role.company.toUpperCase()],
+        1.12, 0.34, [0, 1.61, 0.015], face,
+        { background: "#17394b", foreground: "#f5f3e9", accent: "#c8a665", fontSize: 86 });
+      kit.bevel(`${role.company} ${sideName} authentic mark mount`, [0.94, 0.38, 0.06],
+        p.pale, [0, 1.2, 0.02], face, 0.025);
+      if (role.logo) kit.image(`${role.company} ${sideName} identity mark`, role.logo,
+        0.8, 0.29, [0, 1.2, 0.057], face);
+      else kit.text(`${role.company} ${sideName} exact-name mark`, [role.company.toUpperCase()],
+        0.86, 0.3, [0, 1.2, 0.057], face,
+        { background: "#e9e4d9", foreground: "#193b49", fontSize: 85 });
+      kit.text(`${role.company} ${sideName} role`, roleLines(role.role), 1.13, 0.39,
+        [0, 0.83, 0.018], face,
+        { background: "#153d4d", foreground: "#eaf2ed", accent: "#5cb3c4", fontSize: 64 });
+      const forwardRight = sideName === "arrival" ? side < 0 : side > 0;
+      const arrow = forwardRight ? ">" : "<";
+      const next = index < 7 ? `NEXT ${String(index + 2).padStart(2, "0")} ${arrow}`
+        : `${arrow} CONTACT VIA PLAZA`;
+      kit.text(`${role.company} ${sideName} next-direction cue`, [next], 1.12, 0.18,
+        [0, 0.53, 0.018], face,
+        { background: "#123a4d", foreground: "#ffe6ad", accent: "#5cb3c4", fontSize: 95 });
+    }
+    const topNumber = kit.text(`${role.company} overhead stop number`, [number],
+      0.54, 0.54, [0, 2.22, 0], plinth,
+      { background: "#123b4b", foreground: "#ffe7b2", accent: "#c8a665", fontSize: 270 });
+    topNumber.rotation.x = -Math.PI / 2;
+    const medallionX = point.x + nx * 0.68;
+    const medallionZ = point.z + nz * 0.68;
+    kit.cylinder(`${role.company} ground chronology medallion`, 0.47, 0.47, 0.017,
+      p.brass, [medallionX, 0.224, medallionZ], 16);
+    const groundNumber = kit.text(`${role.company} overhead ground number`, [number],
+      0.62, 0.62, [medallionX, 0.235, medallionZ], kit.group,
+      { background: "#123b4b", foreground: "#ffe7b2", accent: "#c8a665", fontSize: 270 });
+    groundNumber.rotation.x = -Math.PI / 2;
     interactives.push({ id: `experience:${role.id}`, object: plinth,
       label: `${role.company}: ${role.role}`,
       activate: () => options.onExperienceSelect?.(role.id) });
     milestonePositions.set(role.id, new Vector3(10 + x, 0, 13 + z));
     milestoneApproaches.set(role.id, new Vector3(10 + point.x, 0, 13 + point.z));
+    const viewingDirection = index === 7 ? -1 : 1;
+    milestoneViewingPoints.set(role.id,
+      new Vector3(10 + point.x + tangent.x * viewingDirection * 0.95, 0,
+        13 + point.z + tangent.z * viewingDirection * 0.95));
+    milestoneCameras.set(role.id, {
+      position: new Vector3(10 + x - nx * 3.2 - tangent.x * 1.05,
+        2.8, 13 + z - nz * 3.2 - tangent.z * 1.05),
+      target: new Vector3(10 + x, 1.25, 13 + z), durationMs: 700, fov: 48,
+    });
   });
+
+  for (let index = 0; index < 7; index += 1) {
+    const point = curve.getPointAt(0.1225 + index * 0.125);
+    const tangent = curve.getTangentAt(0.1225 + index * 0.125).normalize();
+    const side = new Vector3(-tangent.z, 0, tangent.x);
+    const tail = point.clone().addScaledVector(tangent, -0.29);
+    const tip = point.clone().addScaledVector(tangent, 0.27);
+    kit.beam(`career directed path stem ${index + 1}`,
+      [tail.x, 0.24, tail.z], [tip.x, 0.24, tip.z], 0.025, p.tealLight);
+    for (const direction of [-1, 1]) {
+      const wing = tip.clone().addScaledVector(tangent, -0.2)
+        .addScaledVector(side, direction * 0.18);
+      kit.beam(`career next-stop arrow wing ${index + 1}-${direction}`,
+        [wing.x, 0.24, wing.z], [tip.x, 0.24, tip.z], 0.025, p.goldLight);
+    }
+  }
 
   // Groundcover clusters and small guide lights make this a landscaped route.
   for (let index = 0; index < 21; index += 1) {
@@ -155,11 +222,13 @@ export function createCareerTrail(options: CareerTrailOptions = {}): CareerTrail
   return {
     id: "career-trail", group: kit.group,
     entryPoint: new Vector3(7.67, 0, 10.28),
-    cameraComposition: { position: new Vector3(7.2, 12.1, 25.5),
-      target: new Vector3(11.3, 0.8, 16.3), durationMs: 1050 },
+    cameraComposition: { position: new Vector3(12, 18, 23),
+      target: new Vector3(11.5, 0, 16), durationMs: 1050, fov: 50 },
     interactiveObjects: interactives,
     milestonePositions,
     milestoneApproaches,
+    milestoneViewingPoints,
+    milestoneCameras,
     setReducedMotion(value) { reducedMotion = value; },
     update(delta) {
       if (reducedMotion) return;

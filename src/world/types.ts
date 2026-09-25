@@ -4,6 +4,7 @@ export interface CameraComposition {
   position: Vector3;
   target: Vector3;
   durationMs: number;
+  fov?: number;
 }
 
 export interface InteractiveTarget {

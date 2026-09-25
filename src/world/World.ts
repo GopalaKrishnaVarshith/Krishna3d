@@ -123,7 +123,7 @@ export class World {
   readonly zones: ZoneManager;
   readonly collisionBoundaries: CollisionCircle[] = [];
   private readonly fixedMovementObstacles: CollisionCircle[] = [];
-  readonly spawnPoint = new Vector3(0, SURFACE_Y, 7.25);
+  readonly spawnPoint = new Vector3(0, SURFACE_Y, 9.2);
   private readonly geometries = new Set<BufferGeometry>();
   private readonly materials = new Set<Material>();
   private readonly islandGeometry = this.ownGeometry(irregularDisk());
@@ -132,6 +132,7 @@ export class World {
   private readonly parapetGeometry = this.ownGeometry(new CylinderGeometry(0.07, 0.1, 0.68, 8));
   private readonly capGeometry = this.ownGeometry(new SphereGeometry(0.12, 8, 6));
   private readonly foliageGeometry = this.ownGeometry(new ConeGeometry(0.42, 1.45, 7));
+  private readonly shrubGeometry = this.ownGeometry(new SphereGeometry(0.4, 6, 4));
   private readonly ground = this.ownMaterial(new MeshStandardMaterial({ color: 0xb6b9a6, roughness: 0.93 }));
   private readonly rock = this.ownMaterial(new MeshStandardMaterial({ color: 0x435665, roughness: 1, flatShading: true }));
   private readonly path = this.ownMaterial(new MeshStandardMaterial({ color: 0xd1c8ae, roughness: 0.88 }));
@@ -167,6 +168,7 @@ export class World {
     for (const route of ROUTES) this.createBridge(route);
     this.createPlaza();
     this.createVegetation();
+    this.createTerracePlanting();
     this.createMovementObstacles();
   }
 
@@ -445,6 +447,33 @@ export class World {
     trunks.instanceMatrix.needsUpdate = true;
     foliage.castShadow = true;
     this.group.add(foliage, trunks);
+  }
+
+  private createTerracePlanting(): void {
+    const positions: Vector3[] = [];
+    for (const island of TERRAIN) {
+      const count = island.id.startsWith("career") ? 25 : 31;
+      for (let i = 0; i < count; i += 1) {
+        const angle = (i / count) * Math.PI * 2 + island.radius * 0.45;
+        const radius = island.radius * (0.84 + 0.06 * Math.sin(i * 3.3));
+        const x = island.x + Math.cos(angle) * radius;
+        const z = island.z + Math.sin(angle) * radius;
+        if (ROUTES.some((route) => nearestOnRoute(x, z, route).distance < BRIDGE_HALF_WIDTH + 0.52)) continue;
+        positions.push(new Vector3(x, 0, z));
+      }
+    }
+    const shrubs = new InstancedMesh(this.shrubGeometry, this.foliage, positions.length);
+    shrubs.name = "terrace edge planted clusters";
+    const transform = new Matrix4();
+    positions.forEach((point, index) => {
+      const scale = 0.62 + (index % 5) * 0.16;
+      transform.makeScale(scale * 1.24, scale * 0.52, scale)
+        .setPosition(point.x, 0.19 * scale, point.z);
+      shrubs.setMatrixAt(index, transform);
+    });
+    shrubs.instanceMatrix.needsUpdate = true;
+    shrubs.receiveShadow = true;
+    this.group.add(shrubs);
   }
 
   private createMovementObstacles(): void {

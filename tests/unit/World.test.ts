@@ -62,11 +62,15 @@ describe("World navigation shell", () => {
     const trail = createCareerTrail({ reducedMotion: true });
     const positions = [...trail.milestonePositions.values()];
     const approaches = [...trail.milestoneApproaches.values()];
+    const viewingPoints = [...trail.milestoneViewingPoints.values()];
     expect(positions).toHaveLength(8);
     expect(approaches).toHaveLength(8);
+    expect(viewingPoints).toHaveLength(8);
     for (const position of positions)
       expect(world.isWalkable(position.x, position.z, 0.34)).toBe(true);
     for (const position of approaches)
+      expect(world.isWalkable(position.x, position.z, 0.34)).toBe(true);
+    for (const position of viewingPoints)
       expect(world.isWalkable(position.x, position.z, 0.34)).toBe(true);
     for (let index = 1; index < positions.length; index += 1)
       expect(positions[index].distanceTo(positions[index - 1])).toBeGreaterThan(1.05);

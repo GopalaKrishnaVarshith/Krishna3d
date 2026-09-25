@@ -136,7 +136,7 @@ export function createRegulatoryObservatory(
     id: "observatory", group: kit.group,
     entryPoint: new Vector3(9.55, 0, -1),
     cameraComposition: { position: new Vector3(5.0, 3.05, 7.0),
-      target: new Vector3(12.5, 1.5, -1), durationMs: 1000 },
+      target: new Vector3(12.5, 1.5, -1), durationMs: 1000, fov: 55 },
     interactiveObjects: interactives,
     setReducedMotion(value) { reducedMotion = value; },
     update(delta) {

@@ -47,7 +47,7 @@ export class CameraRig {
   private avatarYaw = 0;
   private reducedMotion: boolean;
   private transition: { fromPosition: Vector3; fromTarget: Vector3;
-    composition: CameraComposition; elapsedMs: number } | null = null;
+    fromFov: number; composition: CameraComposition; elapsedMs: number } | null = null;
 
   constructor(readonly camera: PerspectiveCamera, options: CameraRigOptions = {}) {
     this.terrainHeight = options.terrainHeight ?? (() => -Infinity);
@@ -128,13 +128,14 @@ export class CameraRig {
       this.transition = null;
       this.camera.position.copy(composition.position);
       this.lookTarget.copy(composition.target);
+      this.setFov(composition.fov);
       this.applyTerrain();
       this.enforceSafeView();
       this.camera.lookAt(this.lookTarget);
       return;
     }
     this.transition = { fromPosition: this.camera.position.clone(), fromTarget: this.lookTarget.clone(),
-      composition, elapsedMs: 0 };
+      fromFov: this.camera.fov, composition, elapsedMs: 0 };
   }
 
   skipTransition(): void {
@@ -143,6 +144,7 @@ export class CameraRig {
     this.transition = null;
     this.camera.position.copy(composition.position);
     this.lookTarget.copy(composition.target);
+    this.setFov(composition.fov);
     this.applyTerrain();
     this.enforceSafeView();
     this.camera.lookAt(this.lookTarget);
@@ -156,6 +158,8 @@ export class CameraRig {
     const eased = ratio * ratio * (3 - 2 * ratio);
     this.lookTarget.lerpVectors(transition.fromTarget, transition.composition.target, eased);
     this.camera.position.lerpVectors(transition.fromPosition, transition.composition.position, eased);
+    if (transition.composition.fov !== undefined)
+      this.setFov(transition.fromFov + (transition.composition.fov - transition.fromFov) * eased);
     this.applyTerrain();
     this.enforceSafeView();
     this.camera.lookAt(this.lookTarget);
@@ -193,5 +197,13 @@ export class CameraRig {
 
   private resetVelocity(): void {
     for (const velocity of [...this.positionVelocity, ...this.targetVelocity]) velocity.value = 0;
+  }
+
+  private setFov(fov: number | undefined): void {
+    if (fov === undefined || !Number.isFinite(fov)) return;
+    const bounded = clamp(fov, 25, 100);
+    if (Math.abs(this.camera.fov - bounded) < 1e-6) return;
+    this.camera.fov = bounded;
+    this.camera.updateProjectionMatrix();
   }
 }
