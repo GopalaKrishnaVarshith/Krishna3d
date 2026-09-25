@@ -1,4 +1,4 @@
-import type { PortfolioData } from "../data/types";
+import type { PortfolioData } from "../data/types.ts";
 
 export const DESTINATIONS = [
   { id: "plaza", label: "Arrival Plaza", hint: "Meet Krishna and choose a path" },

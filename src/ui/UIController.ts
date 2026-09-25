@@ -8,6 +8,7 @@ const MOTION_KEY = "krishna-world-reduced-motion";
 const THEME_KEY = "krishna-world-theme";
 const SOUND_KEY = "krishna-world-sound";
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+type MoveDirection = "forward" | "back" | "left" | "right";
 
 export interface UIControllerOptions {
   data?: PortfolioData;
@@ -16,7 +17,7 @@ export interface UIControllerOptions {
   onThemeChange?: (theme: Theme) => void;
   onReducedMotionChange?: (reduced: boolean) => void;
   onSoundChange?: (enabled: boolean) => void;
-  onMove?: (direction: "forward" | "back" | "left" | "right", pressed: boolean) => void;
+  onMove?: (direction: MoveDirection, pressed: boolean) => void;
 }
 
 function saved(key: string): string | null {
@@ -36,6 +37,7 @@ export class UIController {
   private returnFocus: HTMLElement | null = null;
   private priorOverflow = "";
   private readonly priorInert = new Map<HTMLElement, boolean>();
+  private readonly activeMoves = new Map<string, MoveDirection>();
   private fallback = false;
   private disposed = false;
 
@@ -52,10 +54,13 @@ export class UIController {
     this.render();
     this.root.addEventListener("click", this.handleClick);
     this.root.addEventListener("pointerdown", this.handlePointerDown);
-    this.root.addEventListener("pointerup", this.handlePointerUp);
-    this.root.addEventListener("pointercancel", this.handlePointerUp);
+    this.root.addEventListener("lostpointercapture", this.handlePointerUp);
+    document.addEventListener("pointerup", this.handlePointerUp);
+    document.addEventListener("pointercancel", this.handlePointerUp);
     document.addEventListener("keydown", this.handleKeydown);
+    document.addEventListener("keyup", this.handleKeyup);
     document.addEventListener("focusin", this.handleFocusIn);
+    window.addEventListener("blur", this.releaseMoves);
   }
 
   get currentTheme(): Theme { return this.theme; }
@@ -101,6 +106,7 @@ export class UIController {
   }
 
   showFallback(reason: string): void {
+    this.releaseMoves();
     this.closeDialog();
     this.fallback = true;
     this.root.classList.add("is-fallback");
@@ -130,13 +136,17 @@ export class UIController {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.releaseMoves();
     this.closeDialog();
     this.root.removeEventListener("click", this.handleClick);
     this.root.removeEventListener("pointerdown", this.handlePointerDown);
-    this.root.removeEventListener("pointerup", this.handlePointerUp);
-    this.root.removeEventListener("pointercancel", this.handlePointerUp);
+    this.root.removeEventListener("lostpointercapture", this.handlePointerUp);
+    document.removeEventListener("pointerup", this.handlePointerUp);
+    document.removeEventListener("pointercancel", this.handlePointerUp);
     document.removeEventListener("keydown", this.handleKeydown);
+    document.removeEventListener("keyup", this.handleKeyup);
     document.removeEventListener("focusin", this.handleFocusIn);
+    window.removeEventListener("blur", this.releaseMoves);
     if (this.fallback) {
       document.documentElement.classList.remove("fallback-active");
       this.root.classList.remove("is-fallback");
@@ -158,6 +168,7 @@ export class UIController {
   }
 
   private openDialog(element: HTMLElement, type: "project" | "experience", index: number): void {
+    this.releaseMoves();
     if (!this.overlay) {
       this.returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       this.priorOverflow = document.body.style.overflow;
@@ -222,21 +233,28 @@ export class UIController {
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     const target = event.target;
-    if (target instanceof Element) {
-      const direction = target.closest<HTMLElement>("[data-move]")?.dataset.move as "forward" | "back" | "left" | "right" | undefined;
-      if (direction) this.options.onMove?.(direction, true);
-    }
+    if (!(target instanceof Element) || this.overlay) return;
+    const button = target.closest<HTMLButtonElement>("button[data-move]");
+    if (!button || !this.root.contains(button)) return;
+    const direction = button.dataset.move as MoveDirection;
+    this.startMove(`pointer:${event.pointerId}`, direction);
+    try { button.setPointerCapture?.(event.pointerId); } catch { /* Document release still covers unsupported capture. */ }
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
-    const target = event.target;
-    if (target instanceof Element) {
-      const direction = target.closest<HTMLElement>("[data-move]")?.dataset.move as "forward" | "back" | "left" | "right" | undefined;
-      if (direction) this.options.onMove?.(direction, false);
-    }
+    this.stopMove(`pointer:${event.pointerId}`);
   };
 
   private readonly handleKeydown = (event: KeyboardEvent): void => {
+    const moveKey = event.key === "Enter" ? "Enter" : event.key === " " || event.code === "Space" ? "Space" : null;
+    if (moveKey && !this.overlay && event.target instanceof Element) {
+      const button = event.target.closest<HTMLButtonElement>("button[data-move]");
+      if (button && this.root.contains(button)) {
+        event.preventDefault();
+        this.startMove(`keyboard:${moveKey}`, button.dataset.move as MoveDirection);
+        return;
+      }
+    }
     if (!this.overlay) return;
     if (event.key === "Escape") { event.preventDefault(); this.closeDialog(); return; }
     if (event.key !== "Tab") return;
@@ -246,6 +264,31 @@ export class UIController {
     const last = focusable[focusable.length - 1];
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  };
+
+  private readonly handleKeyup = (event: KeyboardEvent): void => {
+    const moveKey = event.key === "Enter" ? "Enter" : event.key === " " || event.code === "Space" ? "Space" : null;
+    if (moveKey) this.stopMove(`keyboard:${moveKey}`);
+  };
+
+  private startMove(source: string, direction: MoveDirection): void {
+    if (this.activeMoves.has(source)) return;
+    const alreadyPressed = [...this.activeMoves.values()].includes(direction);
+    this.activeMoves.set(source, direction);
+    if (!alreadyPressed) this.options.onMove?.(direction, true);
+  }
+
+  private stopMove(source: string): void {
+    const direction = this.activeMoves.get(source);
+    if (!direction) return;
+    this.activeMoves.delete(source);
+    if (![...this.activeMoves.values()].includes(direction)) this.options.onMove?.(direction, false);
+  }
+
+  private readonly releaseMoves = (): void => {
+    const directions = new Set(this.activeMoves.values());
+    this.activeMoves.clear();
+    for (const direction of directions) this.options.onMove?.(direction, false);
   };
 
   private readonly handleFocusIn = (event: FocusEvent): void => {

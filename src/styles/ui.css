@@ -105,6 +105,14 @@ html.fallback-active, html.fallback-active body, html.fallback-active #app { hei
 .fallback-footer h2 { max-width: 15ch; margin: .5rem 0 1rem; font-size: clamp(2.6rem,5vw,4.5rem); font-weight: 540; letter-spacing: -.055em; line-height: 1.05; }
 .fallback-footer a { color: #f1d19b; }
 .fallback-footer p { margin-top: 3rem; color: #c3d4d2; font-size: .75rem; }
+:root[data-theme="day"] #ui.is-fallback,
+:root[data-theme="day"] .fallback-page { color: #172d36; background: #f5f2e9; }
+:root[data-theme="day"] :is(.fallback-header, .fallback-section, .fallback-footer, .fallback-list article) { border-color: #b8c7c4; }
+:root[data-theme="day"] :is(.fallback-header nav a, .fallback-lede, .fallback-reason, .fallback-section-heading p, .fallback-publication p, .fallback-list p, .fallback-highlights, .fallback-footer p) { color: #435b63; }
+:root[data-theme="day"] :is(.fallback-index, .fallback-list .eyebrow, .fallback-list summary, .fallback-publication a, .fallback-footer a) { color: #76521a; }
+:root[data-theme="day"] :is(.fallback-proof, .fallback-company) { color: #203b43 !important; }
+:root[data-theme="day"] .fallback-actions a { border-color: #6b8586; }
+:root[data-theme="day"] .fallback-page a:hover { color: #76521a; }
 @media (max-width: 760px) {
   #ui { padding: calc(12px + var(--safe-area-top)) calc(12px + var(--safe-area-right)) calc(12px + var(--safe-area-bottom)) calc(12px + var(--safe-area-left)); }
   .ui-header { align-items: flex-start; }

@@ -53,12 +53,16 @@ describe("UIController", () => {
     expect(dialog.contains(document.activeElement)).toBe(true);
     expect(root.querySelector<HTMLElement>(".ui-navigation")?.hasAttribute("inert")).toBe(true);
     const last = dialog.querySelectorAll<HTMLElement>("button, a").item(dialog.querySelectorAll("button, a").length - 1);
+    const first = dialog.querySelector<HTMLElement>("button[data-close]")!;
     last.focus();
-    last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
-    expect(dialog.contains(document.activeElement)).toBe(true);
+    last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(first);
+    first.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(last);
     controller.openExperience(portfolioData.experience[0].id);
     expect(root.querySelectorAll('[role="dialog"]')).toHaveLength(1);
     expect(dialog.isConnected).toBe(false);
+    expect(root.querySelector('[role="dialog"]')?.contains(document.activeElement)).toBe(true);
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(root.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(trigger);
@@ -71,8 +75,10 @@ describe("UIController", () => {
     controller.openProject(portfolioData.projects[0].id);
     root.querySelector<HTMLButtonElement>("[data-next]")!.click();
     expect(root.querySelector('[role="dialog"]')?.textContent).toContain(portfolioData.projects[1].title);
+    expect(root.querySelector('[role="dialog"]')?.contains(document.activeElement)).toBe(true);
     root.querySelector<HTMLButtonElement>("[data-previous]")!.click();
     expect(root.querySelector('[role="dialog"]')?.textContent).toContain(portfolioData.projects[0].title);
+    expect(root.querySelector('[role="dialog"]')?.contains(document.activeElement)).toBe(true);
   });
 
   it("persists theme and reduced motion and informs the host", () => {
@@ -99,9 +105,24 @@ describe("UIController", () => {
     expect(onSoundChange).toHaveBeenCalledWith(true);
     expect(root.querySelector("[data-sound-toggle]")?.getAttribute("aria-pressed")).toBe("true");
     const forward = root.querySelector<HTMLButtonElement>('[data-move="forward"]')!;
-    forward.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-    forward.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+    forward.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, bubbles: true }));
+    document.body.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, bubbles: true }));
     expect(onMove.mock.calls).toEqual([["forward", true], ["forward", false]]);
+    forward.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 2, bubbles: true }));
+    document.body.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 2, bubbles: true }));
+    expect(onMove.mock.calls.slice(-2)).toEqual([["forward", true], ["forward", false]]);
+    forward.focus();
+    forward.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    document.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+    expect(onMove.mock.calls.slice(-2)).toEqual([["forward", true], ["forward", false]]);
+    forward.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true, cancelable: true }));
+    document.dispatchEvent(new KeyboardEvent("keyup", { key: " ", code: "Space", bubbles: true }));
+    expect(onMove.mock.calls.slice(-2)).toEqual([["forward", true], ["forward", false]]);
+    forward.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 3, bubbles: true }));
+    controller.dispose();
+    expect(onMove.mock.calls.at(-1)).toEqual(["forward", false]);
+    document.body.dispatchEvent(new PointerEvent("pointerup", { pointerId: 3, bubbles: true }));
+    expect(onMove.mock.calls.at(-1)).toEqual(["forward", false]);
   });
 
   it("sets canonical and structured metadata from the same portfolio data", () => {
@@ -126,5 +147,13 @@ describe("UIController", () => {
     expect(root.querySelector(`a[href="${portfolioData.profile.publication.url}"]`)).toBeTruthy();
     expect(document.querySelector("#experience")?.getAttribute("aria-hidden")).toBe("true");
     expect(document.activeElement?.id).toBe("fallback-title");
+  });
+
+  it("keeps the selected day theme when switching to the text fallback", () => {
+    localStorage.setItem("krishna-world-theme", "day");
+    controller = new UIController(root);
+    controller.showFallback("Text version");
+    expect(document.documentElement.dataset.theme).toBe("day");
+    expect(root.classList.contains("is-fallback")).toBe(true);
   });
 });
