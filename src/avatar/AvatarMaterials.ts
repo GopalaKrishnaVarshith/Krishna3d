@@ -1,4 +1,4 @@
-import { CanvasTexture, Color, DoubleSide, MeshPhysicalMaterial, MeshStandardMaterial,
+import { Color, DoubleSide, MeshPhysicalMaterial, MeshStandardMaterial,
   SRGBColorSpace, type Texture } from "three";
 
 export interface AvatarMaterials {
@@ -41,26 +41,9 @@ function portraitSkinColor(portrait: Texture): Color {
   }
 }
 
-/** One restrained palette; the supplied portrait informs complexion without a visible photo decal. */
+/** Shared fallback palette for the curved avatar and its image-projected surfaces. */
 export function createAvatarMaterials(portrait: Texture): AvatarMaterials {
   const skin = portraitSkinColor(portrait);
-  const hairCanvas = document.createElement("canvas");
-  hairCanvas.width = hairCanvas.height = 256;
-  const hairContext = hairCanvas.getContext("2d");
-  if (!hairContext) throw new Error("The avatar hair requires a 2D canvas context");
-  hairContext.fillStyle = "#281f1f";
-  hairContext.fillRect(0, 0, 256, 256);
-  for (let index = 0; index < 8; index += 1) {
-    const offset = index * 11;
-    hairContext.beginPath();
-    hairContext.moveTo(60 + offset, 226);
-    hairContext.bezierCurveTo(65 + offset, 164, 111 + offset, 116, 147 + offset, 29);
-    hairContext.strokeStyle = index % 2 ? "rgba(139,101,82,0.26)" : "rgba(104,73,65,0.26)";
-    hairContext.lineWidth = index % 3 === 0 ? 6 : 3;
-    hairContext.stroke();
-  }
-  const hairTexture = new CanvasTexture(hairCanvas);
-  hairTexture.colorSpace = SRGBColorSpace;
   return {
     wool: new MeshStandardMaterial({ color: 0x25365d, roughness: 0.86 }),
     lapel: new MeshStandardMaterial({ color: 0x385078, roughness: 0.83, side: DoubleSide }),
@@ -71,13 +54,15 @@ export function createAvatarMaterials(portrait: Texture): AvatarMaterials {
     eyeWhite: new MeshStandardMaterial({ color: 0xdacfc0, roughness: 0.6 }),
     iris: new MeshStandardMaterial({ color: 0x292522, roughness: 0.34 }),
     hair: new MeshStandardMaterial({ color: 0x261f20, roughness: 0.91 }),
-    hairMass: new MeshStandardMaterial({ map: hairTexture, roughness: 0.91, vertexColors: true }),
+    hairMass: new MeshStandardMaterial({ color: 0x261f20, roughness: 0.91,
+      vertexColors: true }),
     hairLock: new MeshStandardMaterial({ color: 0x4a3531, roughness: 0.93, side: DoubleSide }),
     beard: new MeshStandardMaterial({ color: 0x332727, roughness: 1, side: DoubleSide }),
     beardMass: new MeshStandardMaterial({ color: 0x423231, roughness: 1, vertexColors: true,
       side: DoubleSide }),
     lip: new MeshStandardMaterial({ color: 0x935b51, roughness: 0.86 }),
-    leather: new MeshStandardMaterial({ color: 0x67432d, roughness: 0.45 }),
+    leather: new MeshStandardMaterial({ color: 0x603b28, roughness: 0.36,
+      metalness: 0.06 }),
     sole: new MeshStandardMaterial({ color: 0x302520, roughness: 0.85 }),
     gold: new MeshStandardMaterial({ color: 0xd2b47d, metalness: 0.72, roughness: 0.31 }),
     glass: new MeshPhysicalMaterial({

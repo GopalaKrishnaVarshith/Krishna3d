@@ -4,7 +4,7 @@ These images are concept references for a procedurally modeled Three.js world. T
 
 | Area | Concept evidence | Implementation evidence | Status |
 |---|---|---|---|
-| Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Task 5 round 3 four-view, close-up and motion captures listed below | Visual acceptance still open after round 3 self-audit |
+| Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Task 5 round 4 four-view, close-up and motion captures listed below | Visual acceptance still open after round 4 self-audit |
 | Arrival night | `concepts/arrival-night.png` | Added during Task 7 | Awaiting Task 7 review |
 | Arrival day | `concepts/arrival-day.png` | Added during Task 7 | Awaiting Task 7 review |
 | World topology | `concepts/world-map.png` | Added during Task 7 | Awaiting Task 7 review |
@@ -31,7 +31,7 @@ The five PNG files are production design references. Do not ship these full-reso
 
 - **Identity:** use the supplied portrait for likeness, medium-brown complexion, dark wavy hair, thin gold glasses, thick eyebrows, moustache, full beard and softly rectangular face. The face can be sculpted instead of displaying a photographic patch. Never trim or crop the crown to fit the camera.
 - **Body:** tailored navy suit with visible lapels, white open-collar shirt, dark trousers, brown belt, polished brown shoes, and relaxed hands. Retain a single character proportion set across front, three-quarter, side and back.
-- **Procedural build:** one sculpted head with continuous skin cheeks/jaw, modeled eyes, brows, nose ridge, smile, beard and moustache, thin gold eyewear, a single asymmetric hair mass with procedural flow texture, a wraparound tailored jacket over a curved white shirt front, pivoted tapered limbs and brown Oxford shoes. The portrait supplies palette and anatomy cues; the turnaround supplies the full-body silhouette. Both are translated to a visibly stylized mesh budget.
+- **Procedural build:** one curved head with sculpted cheeks/jaw/nose, a swept hair mass, a wraparound jacket over a curved shirt front, pivoted limbs and brown Oxford forms. Round 4 maps the portrait and turnaround to these surfaces to carry the facial, hair and garment detail; the spatial mesh supplies profile and movement.
 - **Camera check:** at normal follow distance, hair, glasses, beard, navy jacket and white shirt must each remain recognizable. Check front and side before approving the model.
 
 ### Initial Task 5 visual gate (superseded after review)
@@ -95,6 +95,14 @@ Round 3 retained the accepted heading-aligned motion. The head now uses a 64-col
 Close renders `task-5-round3-head.png`, `task-5-round3-headthreequarter.png` and `task-5-round3-headside.png` were inspected for eye seating, nose profile, gold frame fit, hair layering and beard wrap. `task-5-round3-motion-walk.png`, `task-5-round3-motion-turn.png` and `task-5-round3-motion-interact.png` show no obvious new pose separation or floor-contact regression. Neutral key/fill/rim lighting was used to reveal form, not to claim a Task 7 lighting result.
 
 **Self-review verdict: visual gate still fails.** The model is a cleaner procedural study, but its face, hair and suit remain far simpler than the approved character. Keep Task 5 open for a fresh art-direction/modeling pass. The accepted motion implementation and its tests remain usable.
+
+### Task 5 round 4 image-projected spatial study (2026-09-25)
+
+The current avatar remains a curved, articulated Three.js model. A 134,412-byte WebP atlas derived from the approved turnaround supplies front, three-quarter, side and back clothing/hair detail; the supplied portrait texture supplies the higher-resolution front face. A small shader chooses a source view from the camera angle around the rig and samples it in bind-pose coordinates, so textured clothing remains attached to walking limbs. Skin hands, neck and brown shoes use solid materials. This is a reference-led spatial rendering attempt, with no opaque character library or additional runtime dependency.
+
+`../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-round4-{front,threequarter,side,back,world}.png` are the full-body and follow-distance captures. `task-5-round4-{head,headthreequarter,headside}.png` show the close face; `task-5-round4-{walk,turn,interact,reduced}.png` sample motion. Static close and full-body captures are 1100 × 900; follow-distance and motion captures are 1600 × 900. The captures were inspected with `view_image` against both references.
+
+**Self-review verdict: visual gate remains open.** The face and suit detail are more recognizable, and the side/back maps carry useful depth cues. At close range, the view projection can still produce abrupt face/hair transitions; the sleeves, shoulder join, trouser drape, hands and shoes remain visibly less natural than the approved turnaround. The view-based blend also needs moving-camera evaluation. Do not treat these captures as acceptance or assume final plaza lighting will resolve the remaining form issues. The previously accepted heading-aligned motion controller remains unchanged and its tests still pass.
 
 ## Theme pairing
 
