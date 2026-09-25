@@ -4,7 +4,7 @@ These images are concept references for a procedurally modeled Three.js world. T
 
 | Area | Concept evidence | Implementation evidence | Status |
 |---|---|---|---|
-| Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Task 5 round 2 four-view and motion captures listed below | Round 2 visual gate submitted for independent review |
+| Avatar silhouette | `concepts/avatar-turnaround.png` and supplied portrait | Task 5 round 3 four-view, close-up and motion captures listed below | Visual acceptance still open after round 3 self-audit |
 | Arrival night | `concepts/arrival-night.png` | Added during Task 7 | Awaiting Task 7 review |
 | Arrival day | `concepts/arrival-day.png` | Added during Task 7 | Awaiting Task 7 review |
 | World topology | `concepts/world-map.png` | Added during Task 7 | Awaiting Task 7 review |
@@ -80,6 +80,21 @@ The round 2 model removes the portrait decal entirely. The portrait is sampled o
 Additional close QA images (`task-5-round2-head.png`, `task-5-round2-headthreequarter.png`, `task-5-round2-headside.png`) were used to check face, hairline, beard, eyewear and neckline alignment. The final rig was also rendered in `task-5-round2-motion-walk.png`, `task-5-round2-motion-turn.png`, `task-5-round2-motion-interact.png` and `task-5-round2-motion-reduced-idle.png`; floor contact and elbow continuity were inspected after changing leg length. The turn/sliding logic and its unit test remain the independently accepted round 1 implementation.
 
 Round 2 is a deliberate low-poly interpretation and remains less detailed than the smooth turnaround. These images establish a new review candidate, not independent acceptance or final world lighting proof.
+
+### Task 5 round 3 self-audit (2026-09-25)
+
+Round 3 retained the accepted heading-aligned motion. The head now uses a 64-column × 48-row surface with shaped cheeks, eye sockets, a bridge/tip nose profile and subtle vertex color. Almond eye surfaces sit against that head; pupils, lids, brows and thin gold oval frames share its landmarks. The beard is a wider continuous jaw mesh that tapers near the ears, and the moustache is smaller and seated on the face. The hair has a fitted base and five swept raised ribbons on the same scalp surface. Sleeves and trousers follow slightly bent centerlines; the jacket has a shorter shaped hem and shallow folded lapels; the shoes use a low upper, vamp seam, heel and thin sole.
+
+| View | Round 3 render | Self-inspection against portrait and turnaround |
+|---|---|---|
+| Front | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-round3-front.png` (1100 × 900) | Full crown and shoes, with modeled hair/glasses/beard and a navy/white suit. Figure remains visibly schematic beside the tailored turnaround. |
+| Three-quarter | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-round3-threequarter.png` (1100 × 900) | Head, beard, lapel and shoe profiles are more continuous, but facial expression and garment drape remain simplified. |
+| Side | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-round3-side.png` (1100 × 900) | Nose and beard follow the head, and the lower shoe shape is visible. Side head and sleeve remain too plain relative to the reference. |
+| World-scale proxy | `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-5-round3-world.png` (1600 × 900) | Identity categories remain visible; the finished-character quality required for the visual gate is not established. |
+
+Close renders `task-5-round3-head.png`, `task-5-round3-headthreequarter.png` and `task-5-round3-headside.png` were inspected for eye seating, nose profile, gold frame fit, hair layering and beard wrap. `task-5-round3-motion-walk.png`, `task-5-round3-motion-turn.png` and `task-5-round3-motion-interact.png` show no obvious new pose separation or floor-contact regression. Neutral key/fill/rim lighting was used to reveal form, not to claim a Task 7 lighting result.
+
+**Self-review verdict: visual gate still fails.** The model is a cleaner procedural study, but its face, hair and suit remain far simpler than the approved character. Keep Task 5 open for a fresh art-direction/modeling pass. The accepted motion implementation and its tests remain usable.
 
 ## Theme pairing
 

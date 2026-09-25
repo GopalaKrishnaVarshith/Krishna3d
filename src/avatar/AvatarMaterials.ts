@@ -6,12 +6,15 @@ export interface AvatarMaterials {
   lapel: MeshStandardMaterial;
   cotton: MeshStandardMaterial;
   skin: MeshStandardMaterial;
+  skinFace: MeshStandardMaterial;
   skinShade: MeshStandardMaterial;
   eyeWhite: MeshStandardMaterial;
   iris: MeshStandardMaterial;
   hair: MeshStandardMaterial;
   hairMass: MeshStandardMaterial;
+  hairLock: MeshStandardMaterial;
   beard: MeshStandardMaterial;
+  beardMass: MeshStandardMaterial;
   lip: MeshStandardMaterial;
   leather: MeshStandardMaterial;
   sole: MeshStandardMaterial;
@@ -63,12 +66,16 @@ export function createAvatarMaterials(portrait: Texture): AvatarMaterials {
     lapel: new MeshStandardMaterial({ color: 0x385078, roughness: 0.83, side: DoubleSide }),
     cotton: new MeshStandardMaterial({ color: 0xeae9e5, roughness: 0.96, side: DoubleSide }),
     skin: new MeshStandardMaterial({ color: skin, roughness: 0.9 }),
+    skinFace: new MeshStandardMaterial({ color: skin, roughness: 0.91, vertexColors: true }),
     skinShade: new MeshStandardMaterial({ color: skin.clone().multiplyScalar(0.75), roughness: 0.96 }),
     eyeWhite: new MeshStandardMaterial({ color: 0xdacfc0, roughness: 0.6 }),
     iris: new MeshStandardMaterial({ color: 0x292522, roughness: 0.34 }),
     hair: new MeshStandardMaterial({ color: 0x261f20, roughness: 0.91 }),
     hairMass: new MeshStandardMaterial({ map: hairTexture, roughness: 0.91, vertexColors: true }),
+    hairLock: new MeshStandardMaterial({ color: 0x4a3531, roughness: 0.93, side: DoubleSide }),
     beard: new MeshStandardMaterial({ color: 0x332727, roughness: 1, side: DoubleSide }),
+    beardMass: new MeshStandardMaterial({ color: 0x423231, roughness: 1, vertexColors: true,
+      side: DoubleSide }),
     lip: new MeshStandardMaterial({ color: 0x935b51, roughness: 0.86 }),
     leather: new MeshStandardMaterial({ color: 0x67432d, roughness: 0.45 }),
     sole: new MeshStandardMaterial({ color: 0x302520, roughness: 0.85 }),

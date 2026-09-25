@@ -16,12 +16,12 @@ import {
 import { createAvatarMaterials, type AvatarMaterials } from "./AvatarMaterials";
 import { AvatarMotion, type AvatarInput, type AvatarPose } from "./AvatarMotion";
 
-interface Ring { y: number; rx: number; rz: number }
+interface Ring { y: number; rx: number; rz: number; cx?: number; cz?: number }
 
 const UP = new Vector3(0, 1, 0);
 const HEAD: Ring[] = [
-  { y: -0.255, rx: 0.083, rz: 0.091 },
-  { y: -0.213, rx: 0.13, rz: 0.131 },
+  { y: -0.255, rx: 0.1, rz: 0.096 },
+  { y: -0.213, rx: 0.145, rz: 0.136 },
   { y: -0.135, rx: 0.18, rz: 0.159 },
   { y: -0.035, rx: 0.207, rz: 0.178 },
   { y: 0.087, rx: 0.208, rz: 0.172 },
@@ -29,7 +29,7 @@ const HEAD: Ring[] = [
   { y: 0.25, rx: 0.12, rz: 0.103 },
 ];
 const BODY: Ring[] = [
-  { y: -0.18, rx: 0.194, rz: 0.127 },
+  { y: -0.1, rx: 0.19, rz: 0.125 },
   { y: -0.055, rx: 0.18, rz: 0.123 },
   { y: 0.1, rx: 0.195, rz: 0.134 },
   { y: 0.35, rx: 0.22, rz: 0.158 },
@@ -57,6 +57,33 @@ function faceZ(rings: Ring[], x: number, y: number): number {
   return ring.rz * Math.sqrt(Math.max(0.01, 1 - (x / ring.rx) ** 2));
 }
 
+function headPoint(angle: number, y: number): [number, number] {
+  const ring = ringAt(HEAD, y);
+  const sin = Math.sin(angle);
+  const cos = Math.cos(angle);
+  const x = ring.rx * Math.sign(sin) * Math.abs(sin) ** 0.86;
+  let z = ring.rz * Math.sign(cos) * Math.abs(cos) ** 0.9;
+  if (cos > 0) {
+    const ridge = 0.018 * Math.exp(-((angle / 0.17) ** 2 + ((y + 0.003) / 0.08) ** 2));
+    const tip = 0.043 * Math.exp(-((angle / 0.18) ** 2 + ((y + 0.071) / 0.031) ** 2));
+    const wing = 0.012 * Math.exp(-(((Math.abs(angle) - 0.18) / 0.09) ** 2
+      + ((y + 0.078) / 0.03) ** 2));
+    const cheek = 0.014 * Math.exp(-(((Math.abs(angle) - 0.58) / 0.3) ** 2
+      + ((y + 0.028) / 0.115) ** 2));
+    const sockets = [-0.087, 0.087].reduce((sum, eyeX) => sum +
+      0.013 * Math.exp(-(((x - eyeX) / 0.053) ** 2 + ((y - 0.041) / 0.029) ** 2)), 0);
+    z += ridge + tip + wing + cheek - sockets;
+  }
+  return [x, z];
+}
+
+function headSurfaceZ(x: number, y: number): number {
+  const ring = ringAt(HEAD, y);
+  const sine = Math.min(0.999, (Math.abs(x) / ring.rx) ** (1 / 0.86));
+  const angle = Math.sign(x) * Math.asin(sine);
+  return headPoint(angle, y)[1];
+}
+
 function shape(positions: number[], indices: number[]): BufferGeometry {
   const result = new BufferGeometry();
   result.setAttribute("position", new BufferAttribute(new Float32Array(positions), 3));
@@ -71,7 +98,8 @@ function loft(rings: Ring[], segments = 24): BufferGeometry {
   rings.forEach((ring, row) => {
     for (let column = 0; column <= segments; column += 1) {
       const angle = column / segments * Math.PI * 2;
-      positions.push(ring.rx * Math.sin(angle), ring.y, ring.rz * Math.cos(angle));
+      positions.push((ring.cx ?? 0) + ring.rx * Math.sin(angle), ring.y,
+        (ring.cz ?? 0) + ring.rz * Math.cos(angle));
       if (row && column < segments) {
         const below = (row - 1) * (segments + 1) + column;
         const above = row * (segments + 1) + column;
@@ -83,23 +111,27 @@ function loft(rings: Ring[], segments = 24): BufferGeometry {
 }
 
 function sculptedHead(): BufferGeometry {
-  const rows = 32;
-  const columns = 40;
+  const rows = 48;
+  const columns = 64;
   const positions: number[] = [];
+  const colors: number[] = [];
   const indices: number[] = [];
   for (let row = 0; row <= rows; row += 1) {
     const y = -0.255 + row / rows * 0.505;
-    const ring = ringAt(HEAD, y);
     for (let column = 0; column <= columns; column += 1) {
       const angle = column / columns * Math.PI * 2;
-      const sin = Math.sin(angle);
-      const cos = Math.cos(angle);
-      const x = ring.rx * Math.sign(sin) * Math.abs(sin) ** 0.86;
-      const nose = 0.033 * Math.exp(-((Math.atan2(sin, cos) / 0.23) ** 2
-        + ((y + 0.049) / 0.075) ** 2));
-      const cheek = 0.007 * Math.exp(-(((Math.abs(Math.atan2(sin, cos)) - 0.55) / 0.3) ** 2
-        + ((y + 0.03) / 0.12) ** 2));
-      positions.push(x, y, ring.rz * Math.sign(cos) * Math.abs(cos) ** 0.9 + nose + cheek);
+      const [x, z] = headPoint(angle > Math.PI ? angle - Math.PI * 2 : angle, y);
+      positions.push(x, y, z);
+      const forward = Math.max(0, Math.cos(angle));
+      const cheeks = [-0.115, 0.115].reduce((sum, cheekX) => sum +
+        Math.exp(-(((x - cheekX) / 0.05) ** 2 + ((y + 0.035) / 0.067) ** 2)), 0);
+      const sockets = [-0.087, 0.087].reduce((sum, eyeX) => sum +
+        Math.exp(-(((x - eyeX) / 0.054) ** 2 + ((y - 0.05) / 0.031) ** 2)), 0);
+      const nose = Math.exp(-((x / 0.035) ** 2 + ((y + 0.04) / 0.075) ** 2));
+      const lower = Math.max(0, Math.min(1, (-y - 0.12) / 0.13));
+      const tone = 0.98 + forward * (0.035 * cheeks - 0.052 * sockets + 0.02 * nose - 0.045 * lower);
+      colors.push(tone * (1 + 0.01 * cheeks), tone * (1 - 0.015 * cheeks),
+        tone * (1 - 0.02 * cheeks));
       if (row && column < columns) {
         const below = (row - 1) * (columns + 1) + column;
         const above = row * (columns + 1) + column;
@@ -107,27 +139,51 @@ function sculptedHead(): BufferGeometry {
       }
     }
   }
+  const result = shape(positions, indices);
+  result.setAttribute("color", new BufferAttribute(new Float32Array(colors), 3));
+  return result;
+}
+
+function almondEye(centerX: number, centerY: number): BufferGeometry {
+  const steps = 18;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let index = 0; index <= steps; index += 1) {
+    const t = index / steps * 2 - 1;
+    const x = centerX + t * 0.043;
+    const height = Math.sqrt(Math.max(0, 1 - t * t));
+    const upper = centerY + 0.011 * height;
+    const lower = centerY - 0.008 * height;
+    positions.push(x, upper, headSurfaceZ(x, upper) + 0.004,
+      x, lower, headSurfaceZ(x, lower) + 0.004);
+    if (index < steps) {
+      const point = index * 2;
+      indices.push(point, point + 1, point + 2,
+        point + 2, point + 1, point + 3);
+    }
+  }
   return shape(positions, indices);
 }
 
 function beardShell(): BufferGeometry {
-  const rows = 10;
-  const columns = 30;
+  const rows = 14;
+  const columns = 48;
   const positions: number[] = [];
+  const colors: number[] = [];
   const indices: number[] = [];
   for (let row = 0; row <= rows; row += 1) {
     const t = row / rows;
     for (let column = 0; column <= columns; column += 1) {
-      const angle = -2.3 + column / columns * 4.6;
-      const side = Math.abs(angle) / 2.3;
-      const top = -0.145 + 0.085 * side;
-      const bottom = -0.254 + 0.194 * side;
+      const angle = -2.45 + column / columns * 4.9;
+      const side = Math.abs(angle) / 2.45;
+      const top = -0.139 + 0.09 * side * side + 0.004 * Math.sin(7 * angle);
+      const taper = Math.max(0, Math.min(1, (side - 0.78) / 0.22));
+      const bottom = -0.257 + 0.064 * side + 0.145 * taper * taper;
       const y = top + (bottom - top) * t;
-      const ring = ringAt(HEAD, y);
-      const sin = Math.sin(angle);
-      const cos = Math.cos(angle);
-      positions.push(ring.rx * Math.sign(sin) * Math.abs(sin) ** 0.86 * 1.017, y,
-        ring.rz * Math.sign(cos) * Math.abs(cos) ** 0.9 * 1.025 + 0.004);
+      const [x, z] = headPoint(angle, y);
+      positions.push(x * 1.015, y, z * 1.024 + 0.004);
+      const tone = 0.77 + 0.17 * (0.5 + 0.5 * Math.sin(9 * angle + 13 * t));
+      colors.push(tone, tone * 0.91, tone * 0.88);
       if (row < rows && column < columns) {
         const index = row * (columns + 1) + column;
         indices.push(index, index + columns + 1, index + 1,
@@ -135,7 +191,25 @@ function beardShell(): BufferGeometry {
       }
     }
   }
-  return shape(positions, indices);
+  const result = shape(positions, indices);
+  result.setAttribute("color", new BufferAttribute(new Float32Array(colors), 3));
+  return result;
+}
+
+function hairSurface(angle: number, t: number): Vector3 {
+  const radius = Math.sqrt(Math.max(0, 1 - t * t));
+  const forward = Math.cos(angle);
+  const hairline = 0.047 + 0.098 * Math.max(0, forward)
+    - 0.04 * Math.max(0, -forward) + 0.055 * Math.sin(angle);
+  const crest = 0.03 * Math.exp(-(((Math.sin(angle) - 0.32) / 0.61) ** 2))
+    * Math.max(0, forward) * Math.sin(Math.PI * t);
+  const wave = 0.008 * Math.sin(5 * angle - 4 * t) * Math.sin(Math.PI * t);
+  const swell = Math.sin(Math.PI * t);
+  return new Vector3(
+    (0.195 + 0.03 * swell + wave) * radius * Math.sin(angle) + 0.047 * t * t,
+    hairline + (0.365 - hairline) * t + crest,
+    (0.164 + 0.026 * swell + wave * 0.7) * radius * forward - 0.013,
+  );
 }
 
 function hairBase(): BufferGeometry {
@@ -147,20 +221,11 @@ function hairBase(): BufferGeometry {
   const indices: number[] = [];
   for (let row = 0; row <= rows; row += 1) {
     const t = row / rows;
-    const radius = Math.sqrt(Math.max(0, 1 - t * t));
     for (let column = 0; column <= columns; column += 1) {
       const angle = -Math.PI + column / columns * Math.PI * 2;
-      const forward = Math.cos(angle);
-      const hairline = 0.047 + 0.098 * Math.max(0, forward)
-        - 0.04 * Math.max(0, -forward) + 0.055 * Math.sin(angle);
-      const crest = 0.03 * Math.exp(-(((Math.sin(angle) - 0.32) / 0.61) ** 2))
-        * Math.max(0, forward) * Math.sin(Math.PI * t);
-      const wave = 0.008 * Math.sin(5 * angle - 4 * t) * Math.sin(Math.PI * t);
       const tone = 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(5 * angle - 4 * t));
-      const swell = Math.sin(Math.PI * t);
-      positions.push((0.195 + 0.03 * swell + wave) * radius * Math.sin(angle) + 0.047 * t * t,
-        hairline + (0.365 - hairline) * t + crest,
-        (0.164 + 0.026 * swell + wave * 0.7) * radius * forward - 0.013);
+      const point = hairSurface(angle, t);
+      positions.push(point.x, point.y, point.z);
       colors.push(tone, tone * 0.94, tone * 0.92);
       uvs.push(column / columns, t);
       if (row && column < columns) {
@@ -176,6 +241,34 @@ function hairBase(): BufferGeometry {
   return result;
 }
 
+function sweptHairLock(startAngle: number, endAngle: number, startT: number, endT: number): BufferGeometry {
+  const rows = 22;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let row = 0; row <= rows; row += 1) {
+    const s = row / rows;
+    const angle = startAngle + (endAngle - startAngle) * s + 0.07 * Math.sin(Math.PI * s);
+    const t = startT + (endT - startT) * s + 0.035 * Math.sin(2 * Math.PI * s);
+    const width = 0.015 + 0.12 * Math.sin(Math.PI * s);
+    for (const lateral of [-1, 0, 1]) {
+      const actualAngle = angle + width * lateral;
+      const point = hairSurface(actualAngle, t);
+      const lift = (lateral === 0 ? 0.019 : 0.004) * Math.sin(Math.PI * s);
+      const normal = new Vector3(Math.sin(actualAngle), 0.35, Math.cos(actualAngle)).normalize();
+      point.addScaledVector(normal, lift);
+      positions.push(point.x, point.y, point.z);
+    }
+    if (row < rows) {
+      const index = row * 3;
+      indices.push(index, index + 3, index + 1,
+        index + 1, index + 3, index + 4,
+        index + 1, index + 4, index + 2,
+        index + 2, index + 4, index + 5);
+    }
+  }
+  return shape(positions, indices);
+}
+
 function lapelRibbon(side: number): BufferGeometry {
   const rows = [
     { x: 0.097, y: 0.638, width: 0.026 },
@@ -184,17 +277,26 @@ function lapelRibbon(side: number): BufferGeometry {
   ];
   const positions: number[] = [];
   const indices: number[] = [];
-  rows.forEach(({ x, y, width }, row) => {
-    for (const edge of [-1, 1]) {
-      const actualX = side * (x + edge * width);
-      positions.push(actualX, y, faceZ(BODY, actualX, y) + 0.024);
+  for (const lift of [0.026, 0.014]) {
+    rows.forEach(({ x, y, width }) => {
+      for (const edge of [-1, 1]) {
+        const actualX = side * (x + edge * width);
+        positions.push(actualX, y, faceZ(BODY, actualX, y) + lift);
+      }
+    });
+  }
+  const back = rows.length * 2;
+  for (let row = 0; row < rows.length - 1; row += 1) {
+    const index = row * 2;
+    indices.push(index, index + 2, index + 1, index + 1, index + 2, index + 3);
+    indices.push(back + index, back + index + 1, back + index + 2,
+      back + index + 1, back + index + 3, back + index + 2);
+    for (const edge of [0, 1]) {
+      const a = index + edge;
+      const b = index + 2 + edge;
+      indices.push(a, back + a, b, b, back + a, back + b);
     }
-    if (row < rows.length - 1) {
-      const index = row * 2;
-      indices.push(index, index + 2, index + 1,
-        index + 1, index + 2, index + 3);
-    }
-  });
+  }
   return shape(positions, indices);
 }
 
@@ -219,7 +321,10 @@ function jacketShell(): BufferGeometry {
     const opening = 0.34 + 0.12 * chestOpening;
     for (let column = 0; column <= columns; column += 1) {
       const angle = opening + column / columns * (Math.PI * 2 - 2 * opening);
-      positions.push((ring.rx + 0.014) * Math.sin(angle), y,
+      const wrapped = angle > Math.PI ? angle - Math.PI * 2 : angle;
+      const frontTail = 0.048 * Math.exp(-(((Math.abs(wrapped) - 0.55) / 0.28) ** 2))
+        * (1 - row / rows) ** 3;
+      positions.push((ring.rx + 0.014) * Math.sin(angle), y - frontTail,
         (ring.rz + 0.014) * Math.cos(angle));
       if (row && column < columns) {
         const below = (row - 1) * (columns + 1) + column;
@@ -342,24 +447,32 @@ export class Avatar {
     const mat = createAvatarMaterials(portrait);
     const rounded = new SphereGeometry(1, 16, 12);
     const rodShape = new CylinderGeometry(1, 1, 1, 8);
-    const glassesRing = new TorusGeometry(0.05, 0.0015, 5, 36, Math.PI);
-    const lens = new CylinderGeometry(0.052, 0.052, 0.001, 32);
+    const glassesRing = new TorusGeometry(0.047, 0.0016, 5, 36);
+    const lens = new CylinderGeometry(0.046, 0.046, 0.001, 32);
     const upperSleeve = loft([
-      { y: -0.34, rx: 0.059, rz: 0.06 }, { y: -0.22, rx: 0.067, rz: 0.067 },
-      { y: -0.06, rx: 0.077, rz: 0.075 }, { y: 0.04, rx: 0.089, rz: 0.081 },
+      { y: -0.34, rx: 0.059, rz: 0.06, cx: 0.032, cz: 0.016 },
+      { y: -0.22, rx: 0.067, rz: 0.067, cx: 0.027, cz: 0.01 },
+      { y: -0.06, rx: 0.077, rz: 0.075, cx: 0.014 },
+      { y: 0.04, rx: 0.089, rz: 0.081 },
       { y: 0.105, rx: 0.03, rz: 0.035 },
     ], 16);
     const lowerSleeve = loft([
-      { y: -0.318, rx: 0.048, rz: 0.047 }, { y: -0.2, rx: 0.053, rz: 0.051 },
-      { y: -0.04, rx: 0.06, rz: 0.058 }, { y: 0.025, rx: 0.066, rz: 0.063 },
+      { y: -0.318, rx: 0.048, rz: 0.047, cx: -0.017, cz: 0.03 },
+      { y: -0.2, rx: 0.053, rz: 0.051, cx: 0.008, cz: 0.025 },
+      { y: -0.04, rx: 0.06, rz: 0.058, cx: 0.028, cz: 0.007 },
+      { y: 0.025, rx: 0.066, rz: 0.063, cx: 0.032 },
     ], 16);
     const thigh = loft([
-      { y: -0.39, rx: 0.073, rz: 0.075 }, { y: -0.24, rx: 0.083, rz: 0.082 },
-      { y: -0.05, rx: 0.095, rz: 0.092 }, { y: 0.035, rx: 0.097, rz: 0.092 },
+      { y: -0.39, rx: 0.073, rz: 0.075, cx: 0.012, cz: 0.012 },
+      { y: -0.24, rx: 0.083, rz: 0.082, cx: 0.01, cz: 0.006 },
+      { y: -0.05, rx: 0.095, rz: 0.092, cx: 0.006 },
+      { y: 0.035, rx: 0.097, rz: 0.092 },
     ], 16);
     const calf = loft([
-      { y: -0.405, rx: 0.062, rz: 0.064 }, { y: -0.25, rx: 0.07, rz: 0.072 },
-      { y: -0.07, rx: 0.076, rz: 0.077 }, { y: 0.025, rx: 0.071, rz: 0.073 },
+      { y: -0.405, rx: 0.062, rz: 0.064, cx: -0.008, cz: 0.014 },
+      { y: -0.25, rx: 0.07, rz: 0.072, cz: 0.009 },
+      { y: -0.07, rx: 0.076, rz: 0.077, cx: 0.006 },
+      { y: 0.025, rx: 0.071, rz: 0.073 },
     ], 16);
     const cuff = new CylinderGeometry(0.055, 0.052, 0.022, 12);
     const finger = new CylinderGeometry(0.008, 0.006, 0.043, 7);
@@ -393,12 +506,12 @@ export class Avatar {
         [0, y, faceZ(BODY, 0, y) + 0.018], [0.006, 0.006, 0.003], false);
     }
     part(this.hips, "small brown belt", box, mat.leather,
-      [0, -0.005, 0.131], [0.18, 0.028, 0.014], false);
+      [0, -0.005, 0.131], [0.126, 0.019, 0.012], false);
     part(this.hips, "belt buckle", box, mat.gold,
-      [0, -0.005, 0.14], [0.033, 0.03, 0.007], false);
+      [0, -0.005, 0.14], [0.027, 0.022, 0.006], false);
 
-    this.buildLeg("left", -1, thigh, calf, shoe, sole, rounded, box, mat);
-    this.buildLeg("right", 1, thigh, calf, shoe, sole, rounded, box, mat);
+    this.buildLeg("left", -1, thigh, calf, shoe, sole, box, mat);
+    this.buildLeg("right", 1, thigh, calf, shoe, sole, box, mat);
     this.buildArm("left", -1, upperSleeve, lowerSleeve, cuff, rounded, finger, mat);
     this.buildArm("right", 1, upperSleeve, lowerSleeve, cuff, rounded, finger, mat);
 
@@ -410,53 +523,78 @@ export class Avatar {
     this.head.position.y = 0.185;
     this.head.scale.setScalar(0.92);
     this.neck.add(this.head);
-    part(this.head, "sculpted face cheeks and jaw", sculptedHead(), mat.skin);
-    part(this.head, "continuous jaw beard", beardShell(), mat.beard,
+    part(this.head, "sculpted face cheeks and jaw", sculptedHead(), mat.skinFace);
+    part(this.head, "continuous jaw beard", beardShell(), mat.beardMass,
       undefined, undefined, false);
     for (const side of [-1, 1]) {
       const name = side < 0 ? "left" : "right";
       part(this.head, `${name} ear`, rounded, mat.skin,
         [side * 0.208, -0.035, -0.014], [0.03, 0.054, 0.028]);
-      const eyeX = side * 0.084;
-      const eyeY = 0.039;
-      const surfaceZ = faceZ(HEAD, eyeX, eyeY);
-      part(this.head, `${name} almond eye`, rounded, mat.eyeWhite,
-        [eyeX, eyeY, surfaceZ + 0.008], [0.034, 0.0075, 0.01], false);
+      const eyeX = side * 0.087;
+      const eyeY = 0.041;
+      const surfaceZ = headSurfaceZ(eyeX, eyeY);
+      part(this.head, `${name} seated almond eye`, almondEye(eyeX, eyeY), mat.eyeWhite,
+        undefined, undefined, false);
       part(this.head, `${name} dark iris`, rounded, mat.iris,
-        [eyeX + side * 0.004, eyeY, surfaceZ + 0.017], [0.009, 0.01, 0.005], false);
-      part(this.head, `${name} upper eyelid`, rounded, mat.skinShade,
-        [eyeX, eyeY + 0.007, surfaceZ + 0.012], [0.036, 0.005, 0.003], false);
+        [eyeX + side * 0.002, eyeY, surfaceZ + 0.007], [0.008, 0.009, 0.003], false);
+      part(this.head, `${name} upper eyelid`, curveGeometry([
+        [eyeX - 0.041, eyeY, headSurfaceZ(eyeX - 0.041, eyeY) + 0.006],
+        [eyeX - 0.02, eyeY + 0.009, headSurfaceZ(eyeX - 0.02, eyeY + 0.009) + 0.006],
+        [eyeX, eyeY + 0.011, headSurfaceZ(eyeX, eyeY + 0.011) + 0.006],
+        [eyeX + 0.02, eyeY + 0.009, headSurfaceZ(eyeX + 0.02, eyeY + 0.009) + 0.006],
+        [eyeX + 0.041, eyeY, headSurfaceZ(eyeX + 0.041, eyeY) + 0.006],
+      ], 0.0025), mat.skinShade, undefined, undefined, false);
       part(this.head, `${name} eye catchlight`, rounded, mat.eyeWhite,
-        [eyeX + side * 0.001, eyeY + 0.004, surfaceZ + 0.023], [0.002, 0.002, 0.002], false);
+        [eyeX + side * 0.001, eyeY + 0.004, surfaceZ + 0.011], [0.002, 0.002, 0.001], false);
       part(this.head, `${name} expressive eyebrow`, curveGeometry([
-        [side * 0.035, 0.083, 0.178], [side * 0.075, 0.091, 0.176],
-        [side * 0.116, 0.09, 0.16], [side * 0.135, 0.083, 0.144],
-      ], 0.008), mat.hair, undefined, undefined, false);
-      part(this.head, `${name} moustache sweep`, curveGeometry([
-        [side * 0.004, -0.104, 0.189], [side * 0.028, -0.096, 0.187],
-        [side * 0.053, -0.105, 0.176], [side * 0.067, -0.117, 0.162],
-      ], 0.006), mat.beard, undefined, undefined, false);
+        [side * 0.035, 0.084, headSurfaceZ(side * 0.035, 0.084) + 0.009],
+        [side * 0.074, 0.094, headSurfaceZ(side * 0.074, 0.094) + 0.009],
+        [side * 0.117, 0.09, headSurfaceZ(side * 0.117, 0.09) + 0.009],
+        [side * 0.136, 0.082, headSurfaceZ(side * 0.136, 0.082) + 0.009],
+      ], 0.006), mat.hair, undefined, undefined, false);
+      const moustacheX = side * 0.032;
+      const moustacheY = -0.11;
+      part(this.head, `${name} sculpted moustache`, rounded, mat.beard,
+        [moustacheX, moustacheY, headSurfaceZ(moustacheX, moustacheY) + 0.004],
+        [0.035, 0.0085, 0.007], false).rotation.z = -side * 0.12;
       part(this.head, `${name} nostril`, rounded, mat.skinShade,
-        [side * 0.022, -0.083, 0.207], [0.008, 0.004, 0.004], false);
+        [side * 0.023, -0.089, headSurfaceZ(side * 0.023, -0.089) + 0.004],
+        [0.006, 0.003, 0.002], false);
+      const glassesZ = surfaceZ + 0.025;
       part(this.head, `${name} gold glasses rim`, glassesRing, mat.gold,
-        [eyeX, eyeY, 0.207], [1, 0.83, 1], false).rotation.y = side * 0.1;
+        [eyeX, eyeY, glassesZ], [1, 0.82, 1], false).rotation.y = side * 0.15;
       part(this.head, `${name} clear lens`, lens, mat.glass,
-        [eyeX, eyeY, 0.205], [1, 1, 0.83], false).rotation.x = Math.PI / 2;
+        [eyeX, eyeY, glassesZ - 0.002], [1, 1, 0.82], false).rotation.x = Math.PI / 2;
       this.rod(this.head, `${name} gold temple`, rodShape, mat.gold,
-        new Vector3(side * 0.138, eyeY, 0.202),
+        new Vector3(side * 0.136, eyeY, glassesZ - 0.008),
         new Vector3(side * 0.208, 0.014, 0), 0.002);
     }
     part(this.head, "subtle smiling mouth", curveGeometry([
-      [-0.054, -0.131, 0.164], [-0.027, -0.141, 0.173],
-      [0, -0.145, 0.176], [0.027, -0.141, 0.173], [0.054, -0.131, 0.164],
-    ], 0.003), mat.iris, undefined, undefined, false);
+      [-0.052, -0.128, headSurfaceZ(-0.052, -0.128) + 0.006],
+      [-0.026, -0.14, headSurfaceZ(-0.026, -0.14) + 0.006],
+      [0, -0.143, headSurfaceZ(0, -0.143) + 0.006],
+      [0.026, -0.14, headSurfaceZ(0.026, -0.14) + 0.006],
+      [0.052, -0.128, headSurfaceZ(0.052, -0.128) + 0.006],
+    ], 0.0025), mat.iris, undefined, undefined, false);
     part(this.head, "lower lip", rounded, mat.lip,
-      [0, -0.154, 0.164], [0.04, 0.006, 0.004], false);
+      [0, -0.155, headSurfaceZ(0, -0.155) + 0.004], [0.04, 0.006, 0.003], false);
     part(this.head, "fine gold glasses bridge", curveGeometry([
-      [-0.032, 0.056, 0.216], [0, 0.063, 0.219], [0.032, 0.056, 0.216],
+      [-0.038, 0.056, headSurfaceZ(-0.038, 0.056) + 0.028],
+      [0, 0.063, headSurfaceZ(0, 0.063) + 0.028],
+      [0.038, 0.056, headSurfaceZ(0.038, 0.056) + 0.028],
     ], 0.0018), mat.gold, undefined, undefined, false);
 
     part(this.head, "single sculpted wavy hair mass", hairBase(), mat.hairMass);
+    for (const [name, startAngle, endAngle, startT, endT] of [
+      ["swept forelock A", -1.08, 0.24, 0.09, 0.69],
+      ["swept forelock B", -0.82, 0.49, 0.1, 0.78],
+      ["swept forelock C", -0.55, 0.72, 0.12, 0.82],
+      ["swept forelock D", -0.3, 0.92, 0.16, 0.76],
+      ["upper crown lock", -1.2, 0.37, 0.47, 0.91],
+    ] as Array<[string, number, number, number, number]>) {
+      part(this.head, name, sweptHairLock(startAngle, endAngle, startT, endT), mat.hairLock,
+        undefined, undefined, false);
+    }
   }
 
   update(input: AvatarInput, delta: number): AvatarPose {
@@ -494,7 +632,7 @@ export class Avatar {
   }
 
   private buildLeg(name: "left" | "right", side: number, thigh: BufferGeometry, calf: BufferGeometry,
-    upper: BufferGeometry, sole: BufferGeometry, rounded: BufferGeometry, box: BufferGeometry,
+    upper: BufferGeometry, sole: BufferGeometry, box: BufferGeometry,
     mat: AvatarMaterials): void {
     const hip = side < 0 ? this.leftHip : this.rightHip;
     const knee = side < 0 ? this.leftKnee : this.rightKnee;
@@ -503,19 +641,23 @@ export class Avatar {
     hip.scale.y = 1.335;
     hip.rotation.z = side * 0.025;
     this.group.add(hip);
-    part(hip, `${name} trouser thigh`, thigh, mat.wool);
+    part(hip, `${name} trouser thigh`, thigh, mat.wool,
+      undefined, [side, 1, 1]);
     knee.name = `${name}Knee`;
     knee.position.y = -0.387;
     knee.rotation.z = -side * 0.03;
     hip.add(knee);
-    part(knee, `${name} shaped trouser calf`, calf, mat.wool);
+    part(knee, `${name} shaped trouser calf`, calf, mat.wool,
+      undefined, [side, 1, 1]);
     const shoeY = -0.474;
     part(knee, `${name} curved Oxford upper`, upper, mat.leather, [0, shoeY, 0]);
-    part(knee, `${name} Oxford toe cap`, rounded, mat.leather,
-      [0, shoeY + 0.05, 0.148], [0.085, 0.044, 0.067]);
     part(knee, `${name} outlined shoe sole`, sole, mat.sole, [0, shoeY, 0]);
     part(knee, `${name} dark heel`, box, mat.sole,
       [0, shoeY + 0.015, -0.079], [0.125, 0.03, 0.064]);
+    part(knee, `${name} Oxford vamp seam`, curveGeometry([
+      [-0.07, shoeY + 0.07, 0.075], [0, shoeY + 0.084, 0.084],
+      [0.07, shoeY + 0.07, 0.075],
+    ], 0.0016), mat.sole, undefined, undefined, false);
     for (const z of [-0.018, 0.013, 0.044]) {
       this.rod(knee, `${name} shoe lace ${z}`, box, mat.sole,
         new Vector3(-0.024, shoeY + 0.112 - (z + 0.018) * 0.22, z),
@@ -531,12 +673,14 @@ export class Avatar {
     shoulder.position.set(side * 0.261, 0.47, 0);
     shoulder.rotation.z = side * 0.18;
     this.hips.add(shoulder);
-    part(shoulder, `${name} tailored upper sleeve`, upper, mat.wool);
+    part(shoulder, `${name} tailored upper sleeve`, upper, mat.wool,
+      undefined, [side, 1, 1]);
     elbow.name = `${name}Elbow`;
     elbow.position.set(side * 0.016, -0.33, 0);
     elbow.rotation.z = -side * 0.27;
     shoulder.add(elbow);
-    part(elbow, `${name} tapered forearm sleeve`, lower, mat.wool);
+    part(elbow, `${name} tapered forearm sleeve`, lower, mat.wool,
+      undefined, [side, 1, 1]);
     part(elbow, `${name} white shirt cuff`, cuff, mat.cotton,
       [0, -0.318, 0]);
     part(elbow, `${name} relaxed palm`, rounded, mat.skin,
