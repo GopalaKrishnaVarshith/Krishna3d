@@ -1,378 +1,169 @@
 import {
-  BoxGeometry,
-  BufferAttribute,
-  BufferGeometry,
-  CatmullRomCurve3,
-  CylinderGeometry,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  SphereGeometry,
-  TubeGeometry,
-  Vector3,
-  type Material,
+  BufferAttribute, CapsuleGeometry, DoubleSide, Group, Mesh,
+  MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, TextureLoader, Vector3,
   type Texture,
 } from "three";
-import { createAvatarMaterials, type AvatarMaterials } from "./AvatarMaterials";
 import { AvatarMotion, type AvatarInput, type AvatarPose } from "./AvatarMotion";
-import { bindProjection, loadTurnaroundMap, projectedMaterial } from "./AvatarProjection";
 
-interface Ring { y: number; rx: number; rz: number; cx?: number; cz?: number }
+const HEIGHT = 2.18;
+const WIDTH = 1.08;
+const ANGLES = [0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI] as const;
+const NAMES = ["front", "quarter_positive", "side_positive",
+  "rear_quarter_positive", "back", "quarter_negative", "side_negative",
+  "rear_quarter_negative"] as const;
+type ViewName = typeof NAMES[number];
+export interface AvatarViewSelection { from: ViewName; to: ViewName; blend: number }
+const FACE_CENTERS: Record<ViewName, number> = {
+  front: 256, quarter_positive: 230, side_positive: 199,
+  rear_quarter_positive: 213, back: 256,
+  quarter_negative: 282, side_negative: 313, rear_quarter_negative: 299,
+};
+const VIEW_YAWS: Record<ViewName, number> = {
+  front: 0, quarter_positive: Math.PI / 4, side_positive: Math.PI / 2,
+  rear_quarter_positive: 3 * Math.PI / 4, back: Math.PI,
+  quarter_negative: -Math.PI / 4, side_negative: -Math.PI / 2,
+  rear_quarter_negative: -3 * Math.PI / 4,
+};
 
-const UP = new Vector3(0, 1, 0);
-const HEAD: Ring[] = [
-  { y: -0.255, rx: 0.1, rz: 0.096 },
-  { y: -0.213, rx: 0.145, rz: 0.136 },
-  { y: -0.135, rx: 0.18, rz: 0.159 },
-  { y: -0.035, rx: 0.207, rz: 0.178 },
-  { y: 0.087, rx: 0.208, rz: 0.172 },
-  { y: 0.174, rx: 0.185, rz: 0.155 },
-  { y: 0.25, rx: 0.12, rz: 0.103 },
-];
-const BODY: Ring[] = [
-  { y: -0.1, rx: 0.19, rz: 0.125 },
-  { y: -0.055, rx: 0.18, rz: 0.123 },
-  { y: 0.1, rx: 0.195, rz: 0.134 },
-  { y: 0.35, rx: 0.22, rz: 0.158 },
-  { y: 0.53, rx: 0.27, rz: 0.162 },
-  { y: 0.6, rx: 0.3, rz: 0.153 },
-  { y: 0.65, rx: 0.28, rz: 0.142 },
-  { y: 0.69, rx: 0.27, rz: 0.13 },
-  { y: 0.75, rx: 0.105, rz: 0.081 },
-];
+function clamp01(value: number): number { return Math.max(0, Math.min(1, value)); }
 
-function ringAt(rings: Ring[], y: number): Ring {
-  if (y <= rings[0].y) return rings[0];
-  for (let index = 1; index < rings.length; index += 1) {
-    const upper = rings[index];
-    if (y <= upper.y) {
-      const lower = rings[index - 1];
-      const t = (y - lower.y) / (upper.y - lower.y);
-      return { y, rx: lower.rx + (upper.rx - lower.rx) * t,
-        rz: lower.rz + (upper.rz - lower.rz) * t };
+/** Continuous view selection from one approved character turnaround. */
+export function selectAvatarViews(angle: number): AvatarViewSelection {
+  const normalized = Math.atan2(Math.sin(angle), Math.cos(angle));
+  const positive = normalized >= 0;
+  const names: ViewName[] = ["front",
+    positive ? "quarter_positive" : "quarter_negative",
+    positive ? "side_positive" : "side_negative",
+    positive ? "rear_quarter_positive" : "rear_quarter_negative", "back"];
+  const absolute = Math.abs(normalized);
+  for (let index = 0; index < ANGLES.length - 1; index += 1) {
+    const start = ANGLES[index];
+    const end = ANGLES[index + 1];
+    if (absolute <= end) {
+      const orbitProgress = clamp01((absolute - start) / (end - start));
+      // Retain a crisp character image for most of each arc. The short,
+      // eased interval still has no threshold jump or unrelated face swap.
+      const bandStart = index >= 2 ? 0.55 : 0.84;
+      const bandEnd = index >= 2 ? 0.72 : 0.98;
+      const t = clamp01((orbitProgress - bandStart) / (bandEnd - bandStart));
+      return { from: names[index], to: names[index + 1], blend: t * t * (3 - 2 * t) };
     }
   }
-  return rings[rings.length - 1];
+  return { from: "back", to: "back", blend: 0 };
 }
 
-function faceZ(rings: Ring[], x: number, y: number): number {
-  const ring = ringAt(rings, y);
-  return ring.rz * Math.sqrt(Math.max(0.01, 1 - (x / ring.rx) ** 2));
-}
-
-function headPoint(angle: number, y: number): [number, number] {
-  const ring = ringAt(HEAD, y);
-  const sin = Math.sin(angle);
-  const cos = Math.cos(angle);
-  const x = ring.rx * Math.sign(sin) * Math.abs(sin) ** 0.86;
-  let z = ring.rz * Math.sign(cos) * Math.abs(cos) ** 0.9;
-  if (cos > 0) {
-    const ridge = 0.018 * Math.exp(-((angle / 0.17) ** 2 + ((y + 0.003) / 0.08) ** 2));
-    const tip = 0.043 * Math.exp(-((angle / 0.18) ** 2 + ((y + 0.071) / 0.031) ** 2));
-    const wing = 0.012 * Math.exp(-(((Math.abs(angle) - 0.18) / 0.09) ** 2
-      + ((y + 0.078) / 0.03) ** 2));
-    const cheek = 0.014 * Math.exp(-(((Math.abs(angle) - 0.58) / 0.3) ** 2
-      + ((y + 0.028) / 0.115) ** 2));
-    const sockets = [-0.087, 0.087].reduce((sum, eyeX) => sum +
-      0.013 * Math.exp(-(((x - eyeX) / 0.053) ** 2 + ((y - 0.041) / 0.029) ** 2)), 0);
-    z += ridge + tip + wing + cheek - sockets;
+function viewGeometry(): PlaneGeometry {
+  const geometry = new PlaneGeometry(WIDTH, HEIGHT, 48, 96);
+  const positions = geometry.getAttribute("position") as BufferAttribute;
+  for (let index = 0; index < positions.count; index += 1) {
+    const x = positions.getX(index);
+    const y = positions.getY(index) + HEIGHT / 2;
+    const roundness = 0.038 + 0.06 * Math.exp(-(((y - 1.42) / 0.55) ** 2))
+      + 0.034 * Math.exp(-(((y - 1.93) / 0.23) ** 2));
+    const fraction = x / (WIDTH / 2);
+    positions.setXYZ(index, x, y, roundness * Math.max(0, 1 - fraction * fraction));
   }
-  return [x, z];
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
-function shape(positions: number[], indices: number[]): BufferGeometry {
-  const result = new BufferGeometry();
-  result.setAttribute("position", new BufferAttribute(new Float32Array(positions), 3));
-  result.setIndex(indices);
-  result.computeVertexNormals();
+function shadowPart(parent: Group, name: string, radius: number, length: number,
+  x: number, y: number, z: number, material: MeshStandardMaterial,
+  scaleX = 1, scaleY = 1, scaleZ = 1): void {
+  const mesh = new Mesh(new CapsuleGeometry(radius, length, 6, 12), material);
+  mesh.name = name;
+  mesh.position.set(x, y, z);
+  mesh.scale.set(scaleX, scaleY, scaleZ);
+  mesh.castShadow = true;
+  parent.add(mesh);
+}
+
+function loadViews(prefix: string): Record<ViewName, Texture> {
+  const loader = new TextureLoader();
+  const result = {} as Record<ViewName, Texture>;
+  for (const name of NAMES) {
+    const texture = loader.load(`/assets/avatar/${prefix}${name}.webp`);
+    texture.colorSpace = SRGBColorSpace;
+    texture.anisotropy = 8;
+    result[name] = texture;
+  }
   return result;
 }
 
-function loft(rings: Ring[], segments = 24): BufferGeometry {
-  const positions: number[] = [];
-  const indices: number[] = [];
-  rings.forEach((ring, row) => {
-    for (let column = 0; column <= segments; column += 1) {
-      const angle = column / segments * Math.PI * 2;
-      positions.push((ring.cx ?? 0) + ring.rx * Math.sin(angle), ring.y,
-        (ring.cz ?? 0) + ring.rz * Math.cos(angle));
-      if (row && column < segments) {
-        const below = (row - 1) * (segments + 1) + column;
-        const above = row * (segments + 1) + column;
-        indices.push(below, below + 1, above, below + 1, above + 1, above);
-      }
-    }
+function viewMaterial(views: Record<ViewName, Texture>,
+  actionViews: Record<ViewName, Texture>, walkLeftViews: Record<ViewName, Texture>,
+  walkRightViews: Record<ViewName, Texture>, from: { value: Texture },
+  to: { value: Texture }, actionFrom: { value: Texture },
+  actionTo: { value: Texture }, walkFrom: { value: Texture },
+  walkTo: { value: Texture }, mix: { value: number },
+  actionMix: { value: number }, walkMix: { value: number },
+  faceFromShift: { value: number },
+  faceToShift: { value: number }, wipeSign: { value: number }): MeshStandardMaterial {
+  const material = new MeshStandardMaterial({
+    color: 0xffffff, map: views.front, transparent: true, alphaTest: 0.025,
+    depthWrite: true, side: DoubleSide, roughness: 0.92, metalness: 0,
+    emissive: 0x17191d, emissiveIntensity: 0.15,
   });
-  return shape(positions, indices);
-}
-
-function sculptedHead(): BufferGeometry {
-  const rows = 48;
-  const columns = 64;
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
-  for (let row = 0; row <= rows; row += 1) {
-    const y = -0.255 + row / rows * 0.505;
-    for (let column = 0; column <= columns; column += 1) {
-      const angle = column / columns * Math.PI * 2;
-      const [x, z] = headPoint(angle > Math.PI ? angle - Math.PI * 2 : angle, y);
-      positions.push(x, y, z);
-      const forward = Math.max(0, Math.cos(angle));
-      const cheeks = [-0.115, 0.115].reduce((sum, cheekX) => sum +
-        Math.exp(-(((x - cheekX) / 0.05) ** 2 + ((y + 0.035) / 0.067) ** 2)), 0);
-      const sockets = [-0.087, 0.087].reduce((sum, eyeX) => sum +
-        Math.exp(-(((x - eyeX) / 0.054) ** 2 + ((y - 0.05) / 0.031) ** 2)), 0);
-      const nose = Math.exp(-((x / 0.035) ** 2 + ((y + 0.04) / 0.075) ** 2));
-      const lower = Math.max(0, Math.min(1, (-y - 0.12) / 0.13));
-      const tone = 0.98 + forward * (0.035 * cheeks - 0.052 * sockets + 0.02 * nose - 0.045 * lower);
-      colors.push(tone * (1 + 0.01 * cheeks), tone * (1 - 0.015 * cheeks),
-        tone * (1 - 0.02 * cheeks));
-      if (row && column < columns) {
-        const below = (row - 1) * (columns + 1) + column;
-        const above = row * (columns + 1) + column;
-        indices.push(below, below + 1, above, below + 1, above + 1, above);
-      }
-    }
-  }
-  const result = shape(positions, indices);
-  result.setAttribute("color", new BufferAttribute(new Float32Array(colors), 3));
-  return result;
-}
-
-function hairSurface(angle: number, t: number): Vector3 {
-  const radius = Math.sqrt(Math.max(0, 1 - t * t));
-  const forward = Math.cos(angle);
-  const hairline = 0.018 + 0.187 * Math.max(0, forward)
-    - 0.06 * Math.max(0, -forward) + 0.032 * Math.sin(angle);
-  const crest = 0.052 * Math.exp(-(((Math.sin(angle) - 0.32) / 0.61) ** 2))
-    * Math.max(0, forward) * Math.sin(Math.PI * t);
-  const wave = 0.008 * Math.sin(5 * angle - 4 * t) * Math.sin(Math.PI * t);
-  const swell = Math.sin(Math.PI * t);
-  return new Vector3(
-    (0.235 + 0.025 * swell + wave) * radius * Math.sin(angle) + 0.035 * t * t,
-    hairline + (0.39 - hairline) * t + crest,
-    (0.187 + 0.021 * swell + wave * 0.7) * radius * forward - 0.013,
-  );
-}
-
-function hairBase(): BufferGeometry {
-  const rows = 24;
-  const columns = 64;
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
-  for (let row = 0; row <= rows; row += 1) {
-    const t = row / rows;
-    for (let column = 0; column <= columns; column += 1) {
-      const angle = -Math.PI + column / columns * Math.PI * 2;
-      const tone = 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(5 * angle - 4 * t));
-      const point = hairSurface(angle, t);
-      positions.push(point.x, point.y, point.z);
-      colors.push(tone, tone * 0.94, tone * 0.92);
-      uvs.push(column / columns, t);
-      if (row && column < columns) {
-        const below = (row - 1) * (columns + 1) + column;
-        const above = row * (columns + 1) + column;
-        indices.push(below, below + 1, above, below + 1, above + 1, above);
-      }
-    }
-  }
-  const result = shape(positions, indices);
-  result.setAttribute("color", new BufferAttribute(new Float32Array(colors), 3));
-  result.setAttribute("uv", new BufferAttribute(new Float32Array(uvs), 2));
-  return result;
-}
-
-function sweptHairLock(startAngle: number, endAngle: number, startT: number, endT: number): BufferGeometry {
-  const rows = 22;
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let row = 0; row <= rows; row += 1) {
-    const s = row / rows;
-    const angle = startAngle + (endAngle - startAngle) * s + 0.07 * Math.sin(Math.PI * s);
-    const t = startT + (endT - startT) * s + 0.035 * Math.sin(2 * Math.PI * s);
-    const width = 0.015 + 0.12 * Math.sin(Math.PI * s);
-    for (const lateral of [-1, 0, 1]) {
-      const actualAngle = angle + width * lateral;
-      const point = hairSurface(actualAngle, t);
-      const lift = (lateral === 0 ? 0.019 : 0.004) * Math.sin(Math.PI * s);
-      const normal = new Vector3(Math.sin(actualAngle), 0.35, Math.cos(actualAngle)).normalize();
-      point.addScaledVector(normal, lift);
-      positions.push(point.x, point.y, point.z);
-    }
-    if (row < rows) {
-      const index = row * 3;
-      indices.push(index, index + 3, index + 1,
-        index + 1, index + 3, index + 4,
-        index + 1, index + 4, index + 2,
-        index + 2, index + 4, index + 5);
-    }
-  }
-  return shape(positions, indices);
-}
-
-function lapelRibbon(side: number): BufferGeometry {
-  const rows = [
-    { x: 0.097, y: 0.638, width: 0.026 },
-    { x: 0.168, y: 0.535, width: 0.052 },
-    { x: 0.126, y: 0.365, width: 0.027 },
-  ];
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (const lift of [0.026, 0.014]) {
-    rows.forEach(({ x, y, width }) => {
-      for (const edge of [-1, 1]) {
-        const actualX = side * (x + edge * width);
-        positions.push(actualX, y, faceZ(BODY, actualX, y) + lift);
-      }
-    });
-  }
-  const back = rows.length * 2;
-  for (let row = 0; row < rows.length - 1; row += 1) {
-    const index = row * 2;
-    indices.push(index, index + 2, index + 1, index + 1, index + 2, index + 3);
-    indices.push(back + index, back + index + 1, back + index + 2,
-      back + index + 1, back + index + 3, back + index + 2);
-    for (const edge of [0, 1]) {
-      const a = index + edge;
-      const b = index + 2 + edge;
-      indices.push(a, back + a, b, b, back + a, back + b);
-    }
-  }
-  return shape(positions, indices);
-}
-
-function collarPanel(side: number): BufferGeometry {
-  const points: Array<[number, number]> = [
-    [side * 0.034, 0.635], [side * 0.11, 0.601],
-    [side * 0.092, 0.545], [side * 0.021, 0.576],
-  ];
-  const positions = points.flatMap(([x, y]) => [x, y, faceZ(BODY, x, y) + 0.017]);
-  return shape(positions, [0, 1, 2, 0, 2, 3]);
-}
-
-function jacketShell(): BufferGeometry {
-  const rows = 24;
-  const columns = 40;
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let row = 0; row <= rows; row += 1) {
-    const y = BODY[0].y + row / rows * (BODY[BODY.length - 1].y - BODY[0].y);
-    const ring = ringAt(BODY, y);
-    const chestOpening = Math.exp(-(((y - 0.54) / 0.17) ** 2));
-    const opening = 0.34 + 0.12 * chestOpening;
-    for (let column = 0; column <= columns; column += 1) {
-      const angle = opening + column / columns * (Math.PI * 2 - 2 * opening);
-      const wrapped = angle > Math.PI ? angle - Math.PI * 2 : angle;
-      const frontTail = 0.048 * Math.exp(-(((Math.abs(wrapped) - 0.55) / 0.28) ** 2))
-        * (1 - row / rows) ** 3;
-      positions.push((ring.rx + 0.014) * Math.sin(angle), y - frontTail,
-        (ring.rz + 0.014) * Math.cos(angle));
-      if (row && column < columns) {
-        const below = (row - 1) * (columns + 1) + column;
-        const above = row * (columns + 1) + column;
-        indices.push(below, below + 1, above, below + 1, above + 1, above);
-      }
-    }
-  }
-  return shape(positions, indices);
-}
-
-function shirtFront(): BufferGeometry {
-  const rows = 24;
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let row = 0; row <= rows; row += 1) {
-    const y = row / rows * BODY[BODY.length - 1].y;
-    const ring = ringAt(BODY, y);
-    const chestOpening = Math.exp(-(((y - 0.54) / 0.17) ** 2));
-    const width = ring.rx * Math.sin(0.34 + 0.12 * chestOpening) + 0.008;
-    for (const x of [-width, 0, width]) {
-      positions.push(x, y, faceZ(BODY, x, y) + 0.011);
-    }
-    if (row < rows) {
-      const index = row * 3;
-      indices.push(index, index + 1, index + 3,
-        index + 1, index + 4, index + 3,
-        index + 1, index + 2, index + 4,
-        index + 2, index + 5, index + 4);
-    }
-  }
-  return shape(positions, indices);
-}
-
-function oxfordUpper(): BufferGeometry {
-  const profile = new CatmullRomCurve3([
-    new Vector3(-0.12, 0.04, 0.058),
-    new Vector3(-0.075, 0.069, 0.09),
-    new Vector3(-0.025, 0.079, 0.104),
-    new Vector3(0.05, 0.09, 0.083),
-    new Vector3(0.11, 0.095, 0.058),
-    new Vector3(0.165, 0.082, 0.042),
-    new Vector3(0.205, 0.04, 0.03),
-    new Vector3(0.216, 0.005, 0.021),
-  ]);
-  const sections = 32;
-  const arc = 16;
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let row = 0; row <= sections; row += 1) {
-    const point = profile.getPoint(row / sections);
-    for (let column = 0; column <= arc; column += 1) {
-      const theta = column / arc * Math.PI;
-      positions.push(point.y * Math.cos(theta), 0.018 + point.z * Math.sin(theta), point.x);
-      if (row < sections && column < arc) {
-        const index = row * (arc + 1) + column;
-        indices.push(index, index + 1, index + arc + 1,
-          index + 1, index + arc + 2, index + arc + 1);
-      }
-    }
-  }
-  return shape(positions, indices);
-}
-
-function soleGeometry(): BufferGeometry {
-  const sections = [
-    { z: -0.12, width: 0.067 }, { z: -0.05, width: 0.08 },
-    { z: 0.09, width: 0.105 }, { z: 0.17, width: 0.082 },
-    { z: 0.213, width: 0.026 },
-  ];
-  const positions: number[] = [];
-  const indices: number[] = [];
-  sections.forEach(({ z, width }, index) => {
-    positions.push(-width, 0, z, width, 0, z, -width, 0.023, z, width, 0.023, z);
-    if (index < sections.length - 1) {
-      const i = index * 4;
-      indices.push(i + 2, i + 6, i + 3, i + 3, i + 6, i + 7);
-      indices.push(i, i + 1, i + 4, i + 1, i + 5, i + 4);
-      indices.push(i, i + 4, i + 2, i + 2, i + 4, i + 6);
-      indices.push(i + 1, i + 3, i + 5, i + 3, i + 7, i + 5);
-    }
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.avatarSource = from;
+    shader.uniforms.avatarDestination = to;
+    shader.uniforms.avatarBlend = mix;
+    shader.uniforms.avatarActionSource = actionFrom;
+    shader.uniforms.avatarActionDestination = actionTo;
+    shader.uniforms.avatarActionBlend = actionMix;
+    shader.uniforms.avatarWalkSource = walkFrom;
+    shader.uniforms.avatarWalkDestination = walkTo;
+    shader.uniforms.avatarWalkBlend = walkMix;
+    shader.uniforms.avatarFaceFromShift = faceFromShift;
+    shader.uniforms.avatarFaceToShift = faceToShift;
+    shader.uniforms.avatarWipeSign = wipeSign;
+    shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
+uniform sampler2D avatarSource;
+uniform sampler2D avatarDestination;
+uniform sampler2D avatarActionSource;
+uniform sampler2D avatarActionDestination;
+uniform sampler2D avatarWalkSource;
+uniform sampler2D avatarWalkDestination;
+uniform float avatarBlend;
+uniform float avatarActionBlend;
+uniform float avatarWalkBlend;
+uniform float avatarFaceFromShift;
+uniform float avatarFaceToShift;
+uniform float avatarWipeSign;`)
+      .replace("#include <map_fragment>", `#ifdef USE_MAP
+float avatarHeadWeight = smoothstep(0.72, 0.83, vMapUv.y);
+vec2 avatarUvA = vMapUv + vec2(avatarFaceFromShift * avatarHeadWeight, 0.0);
+vec2 avatarUvB = vMapUv + vec2(avatarFaceToShift * avatarHeadWeight, 0.0);
+vec4 avatarA = texture2D(avatarSource, avatarUvA);
+vec4 avatarB = texture2D(avatarDestination, avatarUvB);
+vec4 avatarC = texture2D(avatarActionSource, avatarUvA);
+vec4 avatarD = texture2D(avatarActionDestination, avatarUvB);
+vec4 avatarE = texture2D(avatarWalkSource, avatarUvA);
+vec4 avatarF = texture2D(avatarWalkDestination, avatarUvB);
+float transitionX = avatarWipeSign > 0.0 ? vMapUv.x : 1.0 - vMapUv.x;
+float bodyMix = smoothstep(1.0 - avatarBlend - 0.045,
+  1.0 - avatarBlend + 0.045, transitionX);
+float faceMix = smoothstep(0.69, 0.91, avatarBlend);
+float localMix = mix(bodyMix, faceMix, avatarHeadWeight);
+vec4 avatarIdle = mix(avatarA, avatarB, localMix);
+vec4 avatarAction = mix(avatarC, avatarD, localMix);
+vec4 avatarWalk = mix(avatarE, avatarF, localMix);
+diffuseColor *= mix(mix(avatarIdle, avatarWalk, avatarWalkBlend),
+  avatarAction, avatarActionBlend);
+#endif`);
+  };
+  material.customProgramCacheKey = () => "approved-multiview-avatar-v4";
+  material.addEventListener("dispose", () => {
+    for (const texture of Object.values(views)) texture.dispose();
+    for (const texture of Object.values(actionViews)) texture.dispose();
+    for (const texture of Object.values(walkLeftViews)) texture.dispose();
+    for (const texture of Object.values(walkRightViews)) texture.dispose();
   });
-  return shape(positions, indices);
+  return material;
 }
 
-function part(parent: Group, name: string, geometry: BufferGeometry, material: Material,
-  position: [number, number, number] = [0, 0, 0], scale: [number, number, number] = [1, 1, 1],
-  shadow = true): Mesh {
-  const result = new Mesh(geometry, material);
-  result.name = name;
-  result.position.set(...position);
-  result.scale.set(...scale);
-  result.castShadow = shadow;
-  result.receiveShadow = shadow;
-  parent.add(result);
-  return result;
-}
-
-function curveGeometry(points: Array<[number, number, number]>, radius: number): BufferGeometry {
-  return new TubeGeometry(new CatmullRomCurve3(points.map(([x, y, z]) => new Vector3(x, y, z))),
-    14, radius, 6, false);
-}
-
-/** A portrait-led sculptural figure with one modeled face and shared, disposable resources. */
+/** Curved, lit character surface and articulated, cast-shadow depth shell. */
 export class Avatar {
   readonly group = new Group();
   readonly colliderRadius = 0.34;
@@ -389,138 +180,75 @@ export class Avatar {
   private readonly rightShoulder = new Group();
   private readonly leftElbow = new Group();
   private readonly rightElbow = new Group();
+  private readonly views = loadViews("");
+  private readonly actionViews = loadViews("interact-");
+  private readonly walkLeftViews = loadViews("walk-left-");
+  private readonly walkRightViews = loadViews("walk-right-");
+  private readonly from = { value: this.views.front };
+  private readonly to = { value: this.views.front };
+  private readonly actionFrom = { value: this.actionViews.front };
+  private readonly actionTo = { value: this.actionViews.front };
+  private readonly walkFrom = { value: this.walkLeftViews.front };
+  private readonly walkTo = { value: this.walkLeftViews.front };
+  private readonly mix = { value: 0 };
+  private readonly actionMix = { value: 0 };
+  private readonly walkMix = { value: 0 };
+  private readonly faceFromShift = { value: 0 };
+  private readonly faceToShift = { value: 0 };
+  private readonly wipeSign = { value: 1 };
+  private readonly visual: Mesh<PlaneGeometry, MeshStandardMaterial>;
+  private readonly rest: Float32Array;
+  private readonly cameraPosition = new Vector3();
   private headAimYaw = 0;
   private headAimPitch = 0;
+  private walkForward = true;
+  private reducedMotion = false;
 
+  // The approved turnaround was derived from the supplied portrait. All
+  // visible angles use that single design; the caller retains portrait ownership.
   constructor(portrait: Texture) {
+    void portrait;
     this.group.name = "KrishnaAvatar";
-    const mat = createAvatarMaterials(portrait);
-    const turnaround = loadTurnaroundMap();
-    const rounded = new SphereGeometry(1, 16, 12);
-    const rodShape = new CylinderGeometry(1, 1, 1, 8);
-    const upperSleeve = loft([
-      { y: -0.35, rx: 0.065, rz: 0.064, cx: 0.028, cz: 0.012 },
-      { y: -0.25, rx: 0.073, rz: 0.072, cx: 0.025, cz: 0.01 },
-      { y: -0.13, rx: 0.085, rz: 0.079, cx: 0.014 },
-      { y: 0.015, rx: 0.098, rz: 0.089 },
-      { y: 0.105, rx: 0.096, rz: 0.083 },
-      { y: 0.145, rx: 0.055, rz: 0.061 },
-    ], 24);
-    const lowerSleeve = loft([
-      { y: -0.318, rx: 0.048, rz: 0.047, cx: -0.017, cz: 0.03 },
-      { y: -0.2, rx: 0.053, rz: 0.051, cx: 0.008, cz: 0.025 },
-      { y: -0.04, rx: 0.06, rz: 0.058, cx: 0.028, cz: 0.007 },
-      { y: 0.025, rx: 0.066, rz: 0.063, cx: 0.032 },
-    ], 24);
-    const thigh = loft([
-      { y: -0.39, rx: 0.073, rz: 0.075, cx: 0.012, cz: 0.012 },
-      { y: -0.24, rx: 0.083, rz: 0.082, cx: 0.01, cz: 0.006 },
-      { y: -0.05, rx: 0.095, rz: 0.092, cx: 0.006 },
-      { y: 0.035, rx: 0.097, rz: 0.092 },
-    ], 16);
-    const calf = loft([
-      { y: -0.405, rx: 0.062, rz: 0.064, cx: -0.008, cz: 0.014 },
-      { y: -0.25, rx: 0.07, rz: 0.072, cz: 0.009 },
-      { y: -0.07, rx: 0.076, rz: 0.077, cx: 0.006 },
-      { y: 0.025, rx: 0.071, rz: 0.073 },
-    ], 16);
-    const cuff = new CylinderGeometry(0.055, 0.052, 0.022, 12);
-    const finger = new CylinderGeometry(0.008, 0.006, 0.043, 7);
-    const shoe = oxfordUpper();
-    const sole = soleGeometry();
-    const box = new BoxGeometry(1, 1, 1);
+    const geometry = viewGeometry();
+    this.rest = Float32Array.from(geometry.getAttribute("position").array as ArrayLike<number>);
+    this.visual = new Mesh(geometry,
+      viewMaterial(this.views, this.actionViews, this.walkLeftViews,
+        this.walkRightViews, this.from, this.to,
+        this.actionFrom, this.actionTo, this.walkFrom, this.walkTo,
+        this.mix, this.actionMix, this.walkMix,
+        this.faceFromShift, this.faceToShift, this.wipeSign));
+    this.visual.name = "lit curved approved character surface";
+    this.visual.receiveShadow = true;
+    this.visual.frustumCulled = false;
+    this.visual.renderOrder = 1;
+    this.visual.onBeforeRender = (_renderer, _scene, camera) => {
+      camera.getWorldPosition(this.cameraPosition);
+      this.orientTo(this.cameraPosition);
+    };
+    this.group.add(this.visual);
 
+    // These genuine volumes have depth, follow the logical joints, and cast
+    // humanoid shadows. They cannot cover the authored face, garments or gaps.
+    const shadow = new MeshStandardMaterial({ color: 0x1b2946,
+      colorWrite: false, depthWrite: false });
     this.hips.name = "hips";
-    this.hips.position.y = 1.15;
+    this.hips.position.y = 1.13;
     this.group.add(this.hips);
-    part(this.hips, "shaped inner torso", loft(BODY, 32), mat.wool);
-    part(this.hips, "curved white shirt front", shirtFront(), mat.cotton,
-      undefined, undefined, false);
-    part(this.hips, "wraparound fitted navy jacket", jacketShell(), mat.wool);
-    part(this.hips, "open collar at throat", shape([
-      -0.034, 0.644, faceZ(BODY, -0.034, 0.644) + 0.022,
-      0, 0.588, faceZ(BODY, 0, 0.588) + 0.022,
-      0.034, 0.644, faceZ(BODY, 0.034, 0.644) + 0.022,
-    ], [0, 1, 2]), mat.skin, undefined, undefined, false);
-    for (const side of [-1, 1]) {
-      const name = side < 0 ? "left" : "right";
-      part(this.hips, `${name} folded shirt collar`, collarPanel(side), mat.cotton,
-        undefined, undefined, false);
-      part(this.hips, `${name} continuous tailored lapel`, lapelRibbon(side), mat.lapel,
-        undefined, undefined, false);
-      part(this.hips, `${name} pocket welt`, box, mat.lapel,
-        [side * 0.165, 0.155, 0.127], [0.07, 0.009, 0.009], false);
-    }
-    for (const y of [0.39, 0.27, 0.15]) {
-      part(this.hips, `shirt button ${y}`, rounded, mat.cotton,
-        [0, y, faceZ(BODY, 0, y) + 0.018], [0.006, 0.006, 0.003], false);
-    }
-    part(this.hips, "small brown belt", box, mat.leather,
-      [0, -0.005, 0.131], [0.126, 0.019, 0.012], false);
-    part(this.hips, "belt buckle", box, mat.gold,
-      [0, -0.005, 0.14], [0.027, 0.022, 0.006], false);
-
-    this.buildLeg("left", -1, thigh, calf, shoe, sole, box, mat);
-    this.buildLeg("right", 1, thigh, calf, shoe, sole, box, mat);
-    this.buildArm("left", -1, upperSleeve, lowerSleeve, cuff, rounded, finger, mat);
-    this.buildArm("right", 1, upperSleeve, lowerSleeve, cuff, rounded, finger, mat);
-
+    shadowPart(this.hips, "torso depth shell", 0.21, 0.5,
+      0, 0.25, -0.025, shadow, 1.25, 1, 0.7);
     this.neck.name = "neck";
-    this.neck.position.y = 0.655;
+    this.neck.position.y = 0.65;
     this.hips.add(this.neck);
-    part(this.neck, "neck", rounded, mat.skin, [0, 0.077, 0], [0.063, 0.074, 0.063]);
+    shadowPart(this.neck, "neck depth shell", 0.065, 0.09, 0, 0.04, 0, shadow);
     this.head.name = "head";
-    this.head.position.y = 0.285;
-    this.head.scale.setScalar(0.75);
+    this.head.position.y = 0.13;
     this.neck.add(this.head);
-    part(this.head, "sculpted face cheeks and jaw", sculptedHead(), mat.skinFace);
-    for (const side of [-1, 1]) {
-      const name = side < 0 ? "left" : "right";
-      part(this.head, `${name} ear`, rounded, mat.skin,
-        [side * 0.208, -0.02, -0.014], [0.022, 0.045, 0.02]);
-      this.rod(this.head, `${name} gold temple`, rodShape, mat.gold,
-        new Vector3(side * 0.142, 0.045, 0.13),
-        new Vector3(side * 0.211, 0.018, -0.015), 0.0016);
-    }
-    part(this.head, "single sculpted wavy hair mass", hairBase(), mat.hairMass);
-    for (const [name, startAngle, endAngle, startT, endT] of [
-      ["swept forelock A", -1.08, 0.24, 0.09, 0.69],
-      ["swept forelock B", -0.82, 0.49, 0.1, 0.78],
-      ["swept forelock C", -0.55, 0.72, 0.12, 0.82],
-      ["swept forelock D", -0.3, 0.92, 0.16, 0.76],
-      ["upper crown lock", -1.2, 0.37, 0.47, 0.91],
-    ] as Array<[string, number, number, number, number]>) {
-      part(this.head, name, sweptHairLock(startAngle, endAngle, startT, endT), mat.hairLock,
-        undefined, undefined, false);
-    }
-    const bodyBases = new Set<Material>([
-      mat.wool, mat.lapel, mat.cotton,
-    ]);
-    const headBases = new Set<Material>([mat.skinFace, mat.skin, mat.hairMass, mat.hairLock]);
-    const projected = new Map<string, Material>();
-    const viewAngle = { value: 0 };
-    const cameraLocal = new Vector3();
-    this.group.updateMatrixWorld(true);
-    this.group.traverse((node) => {
-      if (!(node instanceof Mesh) || Array.isArray(node.material)) return;
-      const isHead = this.head.getObjectById(node.id) !== undefined;
-      const base = node.material;
-      if (!(base instanceof MeshStandardMaterial)
-        || !(isHead ? headBases : bodyBases).has(base)) return;
-      bindProjection(node);
-      const key = `${base.uuid}-${isHead}`;
-      let material = projected.get(key);
-      if (!material) {
-        material = projectedMaterial(base, turnaround, portrait, isHead, viewAngle);
-        projected.set(key, material);
-      }
-      node.material = material;
-      node.onBeforeRender = (_renderer, _scene, camera) => {
-        camera.getWorldPosition(cameraLocal);
-        (isHead ? this.head : this.group).worldToLocal(cameraLocal);
-        viewAngle.value = Math.atan2(cameraLocal.x, cameraLocal.z);
-      };
-    });
+    shadowPart(this.head, "head and hair depth shell", 0.19, 0.17,
+      0, 0.06, 0, shadow, 1, 1.05, 0.85);
+    this.makeLeg("left", -1, shadow);
+    this.makeLeg("right", 1, shadow);
+    this.makeArm("left", -1, shadow);
+    this.makeArm("right", 1, shadow);
   }
 
   update(input: AvatarInput, delta: number): AvatarPose {
@@ -529,7 +257,7 @@ export class Avatar {
     this.group.position.x += pose.velocityX * dt;
     this.group.position.z += pose.velocityZ * dt;
     this.group.rotation.y = pose.yaw;
-    this.hips.position.y = 1.15 + pose.bounce + pose.breath;
+    this.hips.position.y = 1.13 + pose.bounce + pose.breath;
     this.hips.rotation.x = pose.lean;
     this.hips.rotation.z = -pose.turnRate / 3.4 * 0.018;
     this.leftHip.rotation.x = pose.stride * 0.34;
@@ -542,10 +270,17 @@ export class Avatar {
     this.rightElbow.rotation.x = -0.16 - pose.interaction * 0.48;
     this.neck.rotation.x = this.headAimPitch - pose.interaction * 0.08;
     this.head.rotation.y = this.headAimYaw * (1 - pose.interaction * 0.5);
+    const action = clamp01((pose.interaction - 0.25) / 0.65);
+    this.actionMix.value = action * action * (3 - 2 * action);
+    this.walkForward = pose.stride >= 0;
+    const gait = clamp01((Math.abs(pose.stride) - 0.05) / 0.2);
+    this.walkMix.value = this.reducedMotion ? 0 : gait * gait * (3 - 2 * gait);
+    this.animateSurface(pose);
     return pose;
   }
 
   setReducedMotion(value: boolean): void {
+    this.reducedMotion = value;
     this.motion.setReducedMotion(value);
   }
 
@@ -555,78 +290,87 @@ export class Avatar {
     this.headAimYaw = Math.max(-0.48, Math.min(0.48, Math.atan2(local.x, local.z)));
     this.headAimPitch = Math.max(-0.18, Math.min(0.18,
       -Math.atan2(local.y - 1.99, Math.hypot(local.x, local.z))));
+    this.orientTo(target);
   }
 
-  private buildLeg(name: "left" | "right", side: number, thigh: BufferGeometry, calf: BufferGeometry,
-    upper: BufferGeometry, sole: BufferGeometry, box: BufferGeometry,
-    mat: AvatarMaterials): void {
+  private orientTo(target: Vector3): void {
+    this.group.updateWorldMatrix(true, false);
+    const local = this.group.worldToLocal(target.clone());
+    const angle = Math.atan2(local.x, local.z);
+    const selection = selectAvatarViews(angle);
+    this.from.value = this.views[selection.from];
+    this.to.value = this.views[selection.to];
+    this.actionFrom.value = this.actionViews[selection.from];
+    this.actionTo.value = this.actionViews[selection.to];
+    const walkViews = this.walkForward ? this.walkLeftViews : this.walkRightViews;
+    this.walkFrom.value = walkViews[selection.from];
+    this.walkTo.value = walkViews[selection.to];
+    this.mix.value = selection.blend;
+    const faceA = FACE_CENTERS[selection.from];
+    const faceB = FACE_CENTERS[selection.to];
+    const headT = clamp01((selection.blend - 0.69) / 0.22);
+    const headMix = headT * headT * (3 - 2 * headT);
+    const faceAtAngle = faceA + (faceB - faceA) * headMix;
+    this.faceFromShift.value = (faceA - faceAtAngle) / 512;
+    this.faceToShift.value = (faceB - faceAtAngle) / 512;
+    this.wipeSign.value = angle >= 0 ? 1 : -1;
+    const fromYaw = selection.from === "back" && angle < 0 ? -Math.PI
+      : VIEW_YAWS[selection.from];
+    const toYaw = selection.to === "back" && angle < 0 ? -Math.PI
+      : VIEW_YAWS[selection.to];
+    this.visual.rotation.y = fromYaw + (toYaw - fromYaw) * selection.blend;
+    this.visual.updateMatrixWorld();
+  }
+
+  private animateSurface(pose: AvatarPose): void {
+    const position = this.visual.geometry.getAttribute("position") as BufferAttribute;
+    for (let index = 0; index < position.count; index += 1) {
+      const at = index * 3;
+      const x = this.rest[at];
+      const y = this.rest[at + 1];
+      const z = this.rest[at + 2];
+      const side = Math.tanh(x * 13);
+      const leg = clamp01((1.13 - y) / 0.72);
+      const upper = clamp01((y - 0.4) / 0.8);
+      const swing = side * pose.stride;
+      position.setXYZ(index,
+        x + swing * leg * 0.025,
+        y + Math.max(0, swing) * leg * leg * 0.025 + pose.bounce * upper
+          + pose.breath * upper,
+        z + swing * leg * 0.07 + pose.lean * upper * 0.055);
+    }
+    position.needsUpdate = true;
+    this.visual.geometry.computeVertexNormals();
+  }
+
+  private makeLeg(name: "left" | "right", side: number, shadow: MeshStandardMaterial): void {
     const hip = side < 0 ? this.leftHip : this.rightHip;
     const knee = side < 0 ? this.leftKnee : this.rightKnee;
     hip.name = `${name}Hip`;
-    hip.position.set(side * 0.13, 1.15, 0);
-    hip.scale.y = 1.335;
-    hip.rotation.z = side * 0.025;
+    hip.position.set(side * 0.13, 1.13, 0);
     this.group.add(hip);
-    part(hip, `${name} trouser thigh`, thigh, mat.wool,
-      undefined, [side, 1, 1]);
+    shadowPart(hip, `${name} upper leg depth shell`, 0.085, 0.32, 0, -0.24, 0, shadow);
     knee.name = `${name}Knee`;
-    knee.position.y = -0.387;
-    knee.rotation.z = -side * 0.03;
+    knee.position.y = -0.46;
     hip.add(knee);
-    part(knee, `${name} shaped trouser calf`, calf, mat.wool,
-      undefined, [side, 1, 1]);
-    const shoeY = -0.474;
-    part(knee, `${name} curved Oxford upper`, upper, mat.leather, [0, shoeY, 0]);
-    part(knee, `${name} outlined shoe sole`, sole, mat.sole, [0, shoeY, 0]);
-    part(knee, `${name} dark heel`, box, mat.sole,
-      [0, shoeY + 0.015, -0.079], [0.125, 0.03, 0.064]);
-    part(knee, `${name} Oxford vamp seam`, curveGeometry([
-      [-0.07, shoeY + 0.07, 0.075], [0, shoeY + 0.084, 0.084],
-      [0.07, shoeY + 0.07, 0.075],
-    ], 0.0016), mat.sole, undefined, undefined, false);
-    for (const z of [-0.018, 0.013, 0.044]) {
-      this.rod(knee, `${name} shoe lace ${z}`, box, mat.sole,
-        new Vector3(-0.024, shoeY + 0.112 - (z + 0.018) * 0.22, z),
-        new Vector3(0.024, shoeY + 0.112 - (z + 0.018) * 0.22, z), 0.0015);
-    }
+    shadowPart(knee, `${name} lower leg depth shell`, 0.073, 0.35, 0, -0.24, 0, shadow);
+    shadowPart(knee, `${name} shoe depth shell`, 0.08, 0.15,
+      0, -0.49, 0.055, shadow, 1.1, 0.45, 1.55);
   }
 
-  private buildArm(name: "left" | "right", side: number, upper: BufferGeometry, lower: BufferGeometry,
-    cuff: BufferGeometry, rounded: BufferGeometry, finger: BufferGeometry, mat: AvatarMaterials): void {
+  private makeArm(name: "left" | "right", side: number, shadow: MeshStandardMaterial): void {
     const shoulder = side < 0 ? this.leftShoulder : this.rightShoulder;
     const elbow = side < 0 ? this.leftElbow : this.rightElbow;
     shoulder.name = `${name}Shoulder`;
-    shoulder.position.set(side * 0.305, 0.54, 0);
+    shoulder.position.set(side * 0.295, 0.52, 0);
     shoulder.rotation.z = side * 0.12;
     this.hips.add(shoulder);
-    part(shoulder, `${name} rounded shoulder join`, rounded, mat.wool,
-      [0, 0.1, 0], [0.094, 0.057, 0.086]);
-    part(shoulder, `${name} tailored upper sleeve`, upper, mat.wool,
-      undefined, [side, 1, 1]);
+    shadowPart(shoulder, `${name} upper arm depth shell`, 0.075, 0.27,
+      0, -0.2, 0, shadow);
     elbow.name = `${name}Elbow`;
-    elbow.position.set(side * 0.016, -0.35, 0);
-    elbow.rotation.z = -side * 0.18;
+    elbow.position.y = -0.37;
     shoulder.add(elbow);
-    part(elbow, `${name} tapered forearm sleeve`, lower, mat.wool,
-      undefined, [side, 1, 1]);
-    part(elbow, `${name} white shirt cuff`, cuff, mat.cotton,
-      [0, -0.318, 0]);
-    part(elbow, `${name} relaxed palm`, rounded, mat.skin,
-      [0, -0.37, 0.012], [0.04, 0.061, 0.036]);
-    for (const x of [-0.024, -0.008, 0.008, 0.024]) {
-      part(elbow, `${name} finger ${x}`, finger, mat.skin,
-        [x, -0.421, 0.019], [1, 1, 1]);
-    }
-    part(elbow, `${name} thumb`, rounded, mat.skin,
-      [-side * 0.042, -0.363, 0.041], [0.017, 0.041, 0.019]);
-  }
-
-  private rod(parent: Group, name: string, geometry: BufferGeometry, material: Material,
-    start: Vector3, end: Vector3, radius: number): void {
-    const direction = end.clone().sub(start);
-    const result = part(parent, name, geometry, material,
-      [start.x + direction.x * 0.5, start.y + direction.y * 0.5, start.z + direction.z * 0.5],
-      [radius, direction.length(), radius]);
-    result.quaternion.setFromUnitVectors(UP, direction.normalize());
+    shadowPart(elbow, `${name} forearm and hand depth shell`, 0.057, 0.33,
+      0, -0.22, 0, shadow);
   }
 }
