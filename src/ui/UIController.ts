@@ -18,6 +18,12 @@ export interface UIControllerOptions {
   onReducedMotionChange?: (reduced: boolean) => void;
   onSoundChange?: (enabled: boolean) => void;
   onMove?: (direction: MoveDirection, pressed: boolean) => void;
+  onInteract?: () => void;
+  onBrowseProjects?: () => void;
+  onBrowseExperience?: () => void;
+  onProjectSelect?: (id: string) => void;
+  onExperienceSelect?: (id: string) => void;
+  onFallback?: () => void;
 }
 
 function saved(key: string): string | null {
@@ -66,6 +72,8 @@ export class UIController {
   get currentTheme(): Theme { return this.theme; }
   get motionReduced(): boolean { return this.reducedMotion; }
   get soundOn(): boolean { return this.soundEnabled; }
+  get rootElement(): HTMLElement { return this.root; }
+  get isOverlayOpen(): boolean { return this.overlay !== null || this.fallback; }
 
   setZone(id: string): void {
     const destination = DESTINATIONS.find((item) => item.id === id);
@@ -84,6 +92,7 @@ export class UIController {
     if (!loading) return;
     if (progress >= 1) { loading.remove(); return; }
     const value = Math.round(Math.min(1, Math.max(0, progress)) * 100);
+    loading.toggleAttribute("data-preview", value >= 40);
     loading.querySelector<HTMLProgressElement>("progress")!.value = value;
     loading.querySelector<HTMLElement>("[data-loading-number]")!.textContent = `${value}%`;
   }
@@ -105,9 +114,30 @@ export class UIController {
     this.openDialog(renderExperienceOverlay(this.data.experience[index], index, this.data.experience.length), "experience", index);
   }
 
+  openCapability(id: string): void {
+    const domain = this.data.skillDomains.find((item) => item.id === id);
+    if (!domain || this.fallback) return;
+    this.openTopic(domain.title, domain.summary, domain.proof, domain.skills);
+  }
+
+  openDomain(id: string): void {
+    const labels: Record<string, string> = {
+      rims: "RIMS", "document-quality": "Document quality", submissions: "Submissions",
+      pharmacovigilance: "Pharmacovigilance", "data-integrity": "Data integrity",
+      "responsible-ai": "Responsible AI",
+    };
+    const label = labels[id];
+    if (!label || this.fallback) return;
+    const domain = this.data.skillDomains.find((item) => item.id ===
+      (id === "responsible-ai" ? "responsible-ai-delivery" : "regulatory-quality-data"));
+    if (domain) this.openTopic(label, domain.summary, domain.proof, domain.skills);
+  }
+
   showFallback(reason: string): void {
+    if (this.fallback) return;
     this.releaseMoves();
     this.closeDialog();
+    this.options.onFallback?.();
     this.fallback = true;
     this.root.classList.add("is-fallback");
     this.root.replaceChildren(renderFallback(this.data, reason));
@@ -161,13 +191,28 @@ export class UIController {
     this.root.innerHTML = `
       <a class="skip-link" href="#portfolio-navigation">Skip to destinations</a>
       <header class="ui-header"><div class="ui-identity"><span class="ui-monogram" aria-hidden="true">KV</span><div><strong>${escapeHtml(profile.name)}</strong><span data-current-zone>Arrival Plaza</span></div></div><div class="ui-header-actions"><button type="button" data-theme-toggle aria-label="Switch to ${this.theme === "night" ? "day" : "night"} theme">${this.theme === "night" ? "Day" : "Night"} mode</button><button type="button" data-sound-toggle aria-pressed="${this.soundEnabled}" aria-label="${this.soundEnabled ? "Mute" : "Enable"} sound">Sound ${this.soundEnabled ? "on" : "off"}</button><button type="button" data-motion-toggle aria-pressed="${this.reducedMotion}" aria-label="${this.reducedMotion ? "Enable" : "Reduce"} motion">${this.reducedMotion ? "Motion off" : "Reduce motion"}</button></div></header>
-      <nav id="portfolio-navigation" class="ui-navigation" aria-label="Destinations"><span class="eyebrow">Explore the world</span><ol>${DESTINATIONS.map((destination, index) => `<li><button type="button" data-zone-target="${destination.id}" ${index === 0 ? 'aria-current="location"' : ""}><span class="nav-number">${String(index + 1).padStart(2, "0")}</span><span>${escapeHtml(destination.label)}</span></button></li>`).join("")}</ol></nav>
+      <nav id="portfolio-navigation" class="ui-navigation" aria-label="Destinations"><span class="eyebrow">Explore the world</span><ol>${DESTINATIONS.map((destination, index) => `<li><button type="button" data-zone-target="${destination.id}" ${index === 0 ? 'aria-current="location"' : ""}><span class="nav-number">${String(index + 1).padStart(2, "0")}</span><span>${escapeHtml(destination.label)}</span></button></li>`).join("")}</ol><div class="ui-browse"><button type="button" data-browse-projects>Browse projects</button><button type="button" data-browse-experience>Browse experience</button></div></nav>
       <div class="ui-footer"><p class="ui-prompt"><span class="prompt-mark" aria-hidden="true">✦</span><span data-context-prompt>Meet Krishna and choose a path</span></p><div class="ui-quick-links"><a href="mailto:${escapeHtml(profile.email)}">Email</a><a href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span></a><button type="button" data-fallback-toggle>Text version</button></div></div>
-      <div class="mobile-controls" role="group" aria-label="Move in the world"><button type="button" data-move="left" aria-label="Move left">←</button><button type="button" data-move="forward" aria-label="Move forward">↑</button><button type="button" data-move="back" aria-label="Move back">↓</button><button type="button" data-move="right" aria-label="Move right">→</button></div>
+      <div class="mobile-controls" role="group" aria-label="Move in the world"><div class="mobile-touch-pad"></div><button type="button" data-move="left" aria-label="Move left">←</button><button type="button" data-move="forward" aria-label="Move forward">↑</button><button type="button" data-move="back" aria-label="Move back">↓</button><button type="button" data-move="right" aria-label="Move right">→</button><button type="button" data-interact aria-label="Interact">✦</button></div>
       <div class="loading-screen" data-loading role="status" aria-label="Loading portfolio"><div class="loading-inner"><span class="eyebrow">Entering the world</span><strong>${escapeHtml(profile.name)}</strong><p>Building your view of the work.</p><progress max="100" value="0" aria-label="Loading progress"></progress><span data-loading-number>0%</span></div></div>`;
   }
 
-  private openDialog(element: HTMLElement, type: "project" | "experience", index: number): void {
+  private openTopic(title: string, summary: string, proof: string, skills: string[]): void {
+    const dialog = document.createElement("section");
+    dialog.className = "detail-overlay";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "detail-title");
+    dialog.innerHTML = `<div class="detail-backdrop" data-close aria-hidden="true"></div>
+      <div class="detail-panel"><div class="detail-topline"><span class="eyebrow">Capability</span>
+      <button class="text-button" type="button" data-close aria-label="Close details">Close <span aria-hidden="true">×</span></button></div>
+      <div class="detail-scroll"><h2 id="detail-title">${escapeHtml(title)}</h2>
+      <p class="detail-lede">${escapeHtml(summary)}</p><p>${escapeHtml(proof)}</p>
+      <ul class="detail-tags" aria-label="Skills">${skills.map((skill) => `<li>${escapeHtml(skill)}</li>`).join("")}</ul></div></div>`;
+    this.openDialog(dialog, "topic", 0);
+  }
+
+  private openDialog(element: HTMLElement, type: "project" | "experience" | "topic", index: number): void {
     this.releaseMoves();
     if (!this.overlay) {
       this.returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -197,6 +242,17 @@ export class UIController {
     if (button.hasAttribute("data-close")) { this.closeDialog(); return; }
     const zone = button.dataset.zoneTarget;
     if (zone) { this.options.onNavigate?.(zone); this.setZone(zone); return; }
+    if (button.hasAttribute("data-browse-projects")) {
+      if (this.options.onBrowseProjects) this.options.onBrowseProjects();
+      else this.openProject(this.data.projects[0].id);
+      return;
+    }
+    if (button.hasAttribute("data-browse-experience")) {
+      if (this.options.onBrowseExperience) this.options.onBrowseExperience();
+      else this.openExperience(this.data.experience[0].id);
+      return;
+    }
+    if (button.hasAttribute("data-interact")) { this.options.onInteract?.(); return; }
     if (button.hasAttribute("data-theme-toggle")) {
       this.theme = this.theme === "night" ? "day" : "night";
       document.documentElement.dataset.theme = this.theme;
@@ -226,8 +282,15 @@ export class UIController {
       const current = Number(this.overlay?.dataset.detailIndex || 0);
       const records = type === "project" ? this.data.projects : this.data.experience;
       const next = (current + (button.hasAttribute("data-next") ? 1 : -1) + records.length) % records.length;
-      if (type === "project") this.openProject(this.data.projects[next].id);
-      else this.openExperience(this.data.experience[next].id);
+      if (type === "project") {
+        const id = this.data.projects[next].id;
+        if (this.options.onProjectSelect) this.options.onProjectSelect(id);
+        else this.openProject(id);
+      } else if (type === "experience") {
+        const id = this.data.experience[next].id;
+        if (this.options.onExperienceSelect) this.options.onExperienceSelect(id);
+        else this.openExperience(id);
+      }
     }
   };
 

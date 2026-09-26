@@ -87,7 +87,7 @@ describe("ThemeController", () => {
 
   it("themes the actual shared terrain and zone practicals in place", () => {
     const scene = new Scene();
-    const world = new World();
+    const world = new World(undefined, { deferZones: true });
     scene.add(world.group);
     const water = world.group.getObjectByName("shared water plane") as Mesh;
     const geometry = water.geometry;

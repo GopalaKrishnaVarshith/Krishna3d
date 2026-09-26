@@ -94,6 +94,8 @@ export class Controls {
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     this.syncOverlay();
     if (!CONTROL_KEYS.has(event.code) || this.isEditing(event.target)) return;
+    if ((event.code === "Enter" || event.code === "Space") &&
+      (event.target as HTMLElement | null)?.closest?.("button, a[href], summary")) return;
     if (!this.overlayOpen()) event.preventDefault();
     this.input.keyDown(event.code);
   };

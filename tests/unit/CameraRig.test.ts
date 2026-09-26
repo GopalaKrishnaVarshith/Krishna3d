@@ -88,7 +88,7 @@ describe("CameraRig", () => {
   });
 
   it("uses world tree obstructions to push the follow camera in", () => {
-    const world = new World();
+    const world = new World(undefined, { deferZones: true });
     world.collisionBoundaries.length = 0;
     world.collisionBoundaries.push({ center: new Vector3(0, 0, 3), radius: 0.4 });
     const camera = new PerspectiveCamera();

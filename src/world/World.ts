@@ -6,6 +6,23 @@ import {
 } from "three";
 import { ZoneManager } from "./ZoneManager";
 import type { CollisionCircle, WorldZone } from "./types";
+import { createArrivalPlaza } from "./zones/ArrivalPlaza";
+import { createAutomationLab } from "./zones/AutomationLab";
+import { createEvidenceVault } from "./zones/EvidenceVault";
+import { createRegulatoryObservatory } from "./zones/RegulatoryObservatory";
+import { createCareerTrail } from "./zones/CareerTrail";
+import { createContactPortal } from "./zones/ContactPortal";
+
+export interface WorldZoneHandlers {
+  reducedMotion?: boolean;
+  onNavigate?: (zoneId: string) => void;
+  onCapabilitySelect?: (id: string) => void;
+  onProjectSelect?: (id: string) => void;
+  onDomainSelect?: (id: string) => void;
+  onExperienceSelect?: (id: string) => void;
+  onEmail?: (href: string) => void;
+  onLinkedIn?: (href: string) => void;
+}
 
 interface Island { id: string; x: number; z: number; radius: number }
 interface BridgeRoute { id: string; fromX: number; fromZ: number; toX: number; toZ: number; bend: number }
@@ -117,7 +134,7 @@ function bridgeRibbon(route: BridgeRoute): BufferGeometry {
   return geometry;
 }
 
-/** Navigable terrain shell. Task 7 can fill the registered zone groups with architecture. */
+/** Navigable terrain and the six authored destinations. */
 export class World {
   readonly group = new Group();
   readonly zones: ZoneManager;
@@ -146,7 +163,7 @@ export class World {
     emissive: 0xffb452, emissiveIntensity: 0.94, metalness: 0.48, roughness: 0.28 }));
   private disposed = false;
 
-  constructor(onNavigate?: (zone: WorldZone) => void) {
+  constructor(onNavigate?: (zone: WorldZone) => void, options: { deferZones?: boolean } = {}) {
     this.group.name = "FloatingRegulatoryCampus";
     this.edgeLight.userData.worldTheme = {
       night: { color: 0x3cb6c5, emissive: 0x2ccde4, emissiveIntensity: 0.74 },
@@ -163,13 +180,32 @@ export class World {
     water.rotation.x = -Math.PI / 2;
     water.position.y = WATER_Y;
     this.group.add(water);
-    for (const island of ISLANDS) this.createIsland(island);
+    for (const island of ISLANDS) this.createTerrain(island);
     for (const island of CAREER_TERRACES) this.createTerrain(island);
     for (const route of ROUTES) this.createBridge(route);
     this.createPlaza();
     this.createVegetation();
     this.createTerracePlanting();
     this.createMovementObstacles();
+    if (!options.deferZones) this.registerZones();
+  }
+
+  /** Deferral lets the app paint terrain before destination detail is built. */
+  registerZones(handlers: WorldZoneHandlers = {}): void {
+    if (this.disposed) throw new Error("Cannot register zones on a disposed World");
+    if (this.zones.ids.length) throw new Error("World zones are already registered");
+    const { reducedMotion } = handlers;
+    this.zones.register(createArrivalPlaza({ reducedMotion, onNavigate: handlers.onNavigate }));
+    this.zones.register(createAutomationLab({ reducedMotion,
+      onCapabilitySelect: handlers.onCapabilitySelect }));
+    this.zones.register(createEvidenceVault({ reducedMotion,
+      onProjectSelect: handlers.onProjectSelect }));
+    this.zones.register(createRegulatoryObservatory({ reducedMotion,
+      onDomainSelect: handlers.onDomainSelect }));
+    this.zones.register(createCareerTrail({ reducedMotion,
+      onExperienceSelect: handlers.onExperienceSelect }));
+    this.zones.register(createContactPortal({ reducedMotion,
+      onEmail: handlers.onEmail, onLinkedIn: handlers.onLinkedIn }));
   }
 
   getHeightAt(x: number, z: number): number {
@@ -314,20 +350,6 @@ export class World {
     for (const material of this.materials) material.dispose();
     this.collisionBoundaries.length = 0;
     this.fixedMovementObstacles.length = 0;
-  }
-
-  private createIsland(island: Island): void {
-    this.createTerrain(island);
-    const zoneGroup = new Group();
-    zoneGroup.name = `${island.id} zone`;
-    zoneGroup.position.set(island.x, 0, island.z);
-    const entry = island.id === "plaza" ? this.spawnPoint.clone() :
-      new Vector3(island.x * 0.78, SURFACE_Y, island.z * 0.78);
-    const zone: WorldZone = { id: island.id, group: zoneGroup, entryPoint: entry,
-      cameraComposition: { position: entry.clone().add(new Vector3(0, 4.2, 6)),
-        target: entry.clone().add(new Vector3(0, 1.4, 0)), durationMs: 850 },
-      interactiveObjects: [], update: () => undefined, dispose: () => undefined };
-    this.zones.register(zone);
   }
 
   private createTerrain(island: Island): void {

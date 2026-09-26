@@ -125,6 +125,25 @@ describe("UIController", () => {
     expect(onMove.mock.calls.at(-1)).toEqual(["forward", false]);
   });
 
+  it("routes browse, pagination, and mobile interaction through host callbacks", () => {
+    const onBrowseProjects = vi.fn();
+    const onBrowseExperience = vi.fn();
+    const onProjectSelect = vi.fn();
+    const onInteract = vi.fn();
+    controller = new UIController(root, { onBrowseProjects, onBrowseExperience,
+      onProjectSelect, onInteract });
+    root.querySelector<HTMLButtonElement>("[data-browse-projects]")!.click();
+    root.querySelector<HTMLButtonElement>("[data-browse-experience]")!.click();
+    root.querySelector<HTMLButtonElement>("[data-interact]")!.click();
+    expect(onBrowseProjects).toHaveBeenCalledOnce();
+    expect(onBrowseExperience).toHaveBeenCalledOnce();
+    expect(onInteract).toHaveBeenCalledOnce();
+    controller.openProject(portfolioData.projects[0].id);
+    expect(controller.isOverlayOpen).toBe(true);
+    root.querySelector<HTMLButtonElement>("[data-next]")!.click();
+    expect(onProjectSelect).toHaveBeenCalledWith(portfolioData.projects[1].id);
+  });
+
   it("sets canonical and structured metadata from the same portfolio data", () => {
     controller = new UIController(root, { siteUrl: "https://example.org/portfolio" });
     expect(document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe("https://example.org/portfolio/");

@@ -33,4 +33,17 @@ describe("Controls DOM adapter", () => {
     controls = null;
     expect(container.children).toHaveLength(0);
   });
+
+  it("leaves Enter and Space available to focused UI controls", () => {
+    const canvas = document.createElement("div");
+    const button = document.createElement("button");
+    document.body.append(canvas, button);
+    controls = new Controls(canvas);
+    for (const code of ["Enter", "Space"]) {
+      const event = new KeyboardEvent("keydown", { code, bubbles: true, cancelable: true });
+      button.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(controls.state.interact).toBe(false);
+    }
+  });
 });

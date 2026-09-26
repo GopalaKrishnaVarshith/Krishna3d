@@ -7,6 +7,22 @@ import {
   Texture,
   WebGLRenderer,
 } from "three";
+import { Avatar } from "../avatar/Avatar";
+import { CameraRig } from "../camera/CameraRig";
+import { Controls } from "../controls/Controls";
+import type { InteractionEvents } from "../interaction/InteractionSystem";
+import { InteractionSystem } from "../interaction/InteractionSystem";
+import type { UIController } from "../ui/UIController";
+import { DESTINATIONS, assetUrl } from "../ui/templates";
+import { MetricVisualization } from "../world/MetricVisualization";
+import { ProjectVault } from "../world/ProjectVault";
+import { ThemeController, type WorldTheme } from "../world/ThemeController";
+import { World } from "../world/World";
+import type { WorldZone } from "../world/types";
+import type { DynamicWorldZone } from "../world/zones/zoneKit";
+import type { EvidenceVaultZone } from "../world/zones/EvidenceVault";
+import type { CareerTrailZone } from "../world/zones/CareerTrail";
+import { portfolioData } from "../data/portfolioData";
 import { AssetManager } from "./AssetManager";
 import { EventBus, type ExperienceEvents } from "./EventBus";
 import { PerformanceManager } from "./PerformanceManager";
@@ -19,6 +35,24 @@ export class Experience {
   readonly events = new EventBus<ExperienceEvents>();
   readonly assets = new AssetManager();
   readonly performance = new PerformanceManager();
+  private readonly interactionEvents = new EventBus<InteractionEvents>();
+
+  private world: World | null = null;
+  private theme: ThemeController | null = null;
+  private avatar: Avatar | null = null;
+  private controls: Controls | null = null;
+  private cameraRig: CameraRig | null = null;
+  private interaction: InteractionSystem | null = null;
+  private metrics: MetricVisualization | null = null;
+  private vault: ProjectVault | null = null;
+  private ui: UIController | null = null;
+  private readonly mobileMoves = new Set<string>();
+  private interactRequested = false;
+  private interactHeld = false;
+  private soundEnabled = false;
+  private audio: AudioContext | null = null;
+  private fatalHandler: ((reason: string) => void) | null = null;
+  private pointerStart: { x: number; y: number } | null = null;
 
   private started = false;
   private running = false;
@@ -35,8 +69,145 @@ export class Experience {
     this.camera.lookAt(0, 0, 0);
   }
 
+  setFatalHandler(handler: (reason: string) => void): void { this.fatalHandler = handler; }
+
+  /** Build one scene. The terrain is painted before the detailed zones and portrait load. */
+  async initialize(ui: UIController): Promise<void> {
+    if (this.disposed) throw new Error("Cannot initialize a disposed Experience");
+    this.ui = ui;
+    this.soundEnabled = ui.soundOn;
+    const world = new World((zone) => this.enterZone(zone), { deferZones: true });
+    this.world = world;
+    this.scene.add(world.group);
+    this.theme = new ThemeController(this.scene, { reducedMotion: ui.motionReduced });
+    this.theme.bindWorldTerrain(world.group);
+    this.mount();
+    this.camera.fov = 74;
+    this.camera.position.set(0, 6.8, 14.3);
+    this.camera.lookAt(0, -0.5, -1.6);
+    this.resize();
+    this.renderer.render(this.scene, this.camera);
+    ui.setLoading(0.4);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    if (this.disposed) return;
+
+    world.registerZones({
+      reducedMotion: ui.motionReduced,
+      onNavigate: (id) => this.navigate(id),
+      onCapabilitySelect: (id) => this.selectCapability(id),
+      onProjectSelect: (id) => this.openProject(id),
+      onDomainSelect: (id) => this.selectDomain(id),
+      onExperienceSelect: (id) => this.openExperience(id),
+      onEmail: (href) => { window.location.href = href; },
+      onLinkedIn: (href) => { window.open(href, "_blank", "noopener,noreferrer"); },
+    });
+    this.theme.bindSceneMaterials(world.group);
+    ui.setLoading(0.7);
+
+    const portrait = await this.assets.loadTexture(assetUrl(portfolioData.profile.portrait));
+    if (this.disposed) return;
+    const avatar = new Avatar(portrait);
+    this.avatar = avatar;
+    avatar.group.position.copy(world.spawnPoint);
+    avatar.setReducedMotion(ui.motionReduced);
+    this.scene.add(avatar.group);
+
+    const touchPadContainer = ui.rootElement.querySelector<HTMLElement>(".mobile-touch-pad") ?? undefined;
+    this.controls = new Controls(this.renderer.domElement, {
+      overlayOpen: () => ui.isOverlayOpen,
+      touchPadContainer,
+    });
+    this.cameraRig = new CameraRig(this.camera, {
+      terrainHeight: (x, z) => world.getHeightAt(x, z),
+      obstructionDistance: (from, to) => world.getCameraObstructionDistance(from, to),
+      reducedMotion: ui.motionReduced,
+    });
+    this.cameraRig.setAvatarPose(avatar.group.position, avatar.group.rotation.y);
+    this.cameraRig.snapTo(avatar.group.position);
+
+    this.interaction = new InteractionSystem({ camera: this.camera,
+      events: this.interactionEvents, overlayOpen: () => ui.isOverlayOpen, maxDistance: 4.8 });
+    for (const id of world.zones.ids) {
+      for (const target of world.zones.get(id)!.interactiveObjects) this.interaction.register(target);
+    }
+    this.interactionEvents.on("interaction:prompt", ({ action }) =>
+      ui.setContextPrompt(`${action} · press E or Interact`));
+    this.interactionEvents.on("interaction:clear", () => {
+      const id = world.zones.currentZone?.id;
+      const hint = DESTINATIONS.find((destination) => destination.id === id)?.hint;
+      if (hint) ui.setContextPrompt(hint);
+    });
+    this.renderer.domElement.addEventListener("click", this.handleCanvasClick);
+    this.renderer.domElement.addEventListener("pointerdown", this.handleCanvasPointerDown);
+
+    const vaultZone = world.zones.get("evidence-vault") as EvidenceVaultZone;
+    this.metrics = new MetricVisualization();
+    this.vault = new ProjectVault(vaultZone, { metrics: this.metrics, events: this.events });
+    this.navigate("plaza");
+    ui.setLoading(1);
+    this.start();
+  }
+
+  navigate(id: string): void {
+    if (!this.world?.zones.get(id)) return;
+    this.world.zones.navigateTo(id);
+    this.playNavigationSound();
+  }
+
+  openProject(id: string): void {
+    if (!this.world || !this.vault || !this.ui) return;
+    if (this.world.zones.currentZone?.id !== "evidence-vault") this.navigate("evidence-vault");
+    if (!this.vault.open(id)) return;
+    this.ui.openProject(id);
+  }
+
+  openExperience(id: string): void {
+    if (!this.world || !this.ui) return;
+    if (this.world.zones.currentZone?.id !== "career-trail") this.navigate("career-trail");
+    const trail = this.world.zones.get("career-trail") as CareerTrailZone;
+    const point = trail.milestoneViewingPoints.get(id);
+    const composition = trail.milestoneCameras.get(id);
+    if (point && composition && this.avatar && this.cameraRig) {
+      this.avatar.group.position.copy(this.world.constrainPosition(point, this.avatar.colliderRadius));
+      this.cameraRig.setAvatarPose(this.avatar.group.position, this.avatar.group.rotation.y);
+      this.cameraRig.transitionTo(composition);
+    }
+    this.ui.openExperience(id);
+  }
+
+  setTheme(theme: WorldTheme): void {
+    this.theme?.setTheme(theme);
+    this.events.emit("theme:change", { theme });
+  }
+
+  setReducedMotion(value: boolean): void {
+    this.theme?.setReducedMotion(value);
+    this.avatar?.setReducedMotion(value);
+    this.cameraRig?.setReducedMotion(value);
+    for (const id of this.world?.zones.ids ?? [])
+      (this.world?.zones.get(id) as DynamicWorldZone).setReducedMotion(value);
+  }
+
+  setSound(value: boolean): void {
+    this.soundEnabled = value;
+    if (value) void this.ensureAudio()?.resume();
+    else void this.audio?.suspend();
+  }
+
+  setMove(direction: "forward" | "back" | "left" | "right", pressed: boolean): void {
+    if (pressed) this.mobileMoves.add(direction);
+    else this.mobileMoves.delete(direction);
+  }
+
+  requestInteraction(): void { if (!this.ui?.isOverlayOpen) this.interactRequested = true; }
+
   start(): void {
     if (this.disposed) throw new Error("Cannot start a disposed Experience");
+    this.mount();
+    this.resume();
+  }
+
+  private mount(): void {
     if (this.started) return;
     this.started = true;
     this.container.appendChild(this.renderer.domElement);
@@ -45,7 +216,6 @@ export class Experience {
     this.renderer.domElement.addEventListener("webglcontextlost", this.handleContextLost);
     this.renderer.domElement.addEventListener("webglcontextrestored", this.handleContextRestored);
     this.resize();
-    this.resume();
   }
 
   dispose(): void {
@@ -55,12 +225,48 @@ export class Experience {
     document.removeEventListener("visibilitychange", this.handleVisibilityChange);
     this.renderer.domElement.removeEventListener("webglcontextlost", this.handleContextLost);
     this.renderer.domElement.removeEventListener("webglcontextrestored", this.handleContextRestored);
+    this.renderer.domElement.removeEventListener("click", this.handleCanvasClick);
+    this.renderer.domElement.removeEventListener("pointerdown", this.handleCanvasPointerDown);
     this.pause();
 
+    this.vault?.dispose();
+    this.metrics?.dispose();
+    this.interaction?.dispose();
+    this.interactionEvents.clear();
+    this.controls?.dispose();
+    this.mobileMoves.clear();
+    if (this.avatar) {
+      this.disposeObjectResources(this.avatar.group);
+      this.avatar.group.removeFromParent();
+    }
+    this.world?.dispose();
+    this.theme?.dispose();
+    void this.audio?.close();
+    this.audio = null;
+    this.ui = null;
+    this.vault = null;
+    this.metrics = null;
+    this.interaction = null;
+    this.controls = null;
+    this.cameraRig = null;
+    this.avatar = null;
+    this.world = null;
+    this.theme = null;
+
+    this.disposeObjectResources(this.scene);
+    this.scene.clear();
+    this.assets.dispose();
+    this.events.clear();
+    this.renderer.forceContextLoss();
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
+  }
+
+  private disposeObjectResources(root: Scene | Avatar["group"]): void {
     const geometries = new Set<BufferGeometry>();
     const materials = new Set<Material>();
     const materialTextures = new Set<Texture>();
-    this.scene.traverse((object) => {
+    root.traverse((object) => {
       const drawable = object as typeof object & {
         geometry?: BufferGeometry;
         material?: Material | Material[];
@@ -81,12 +287,6 @@ export class Experience {
       material.dispose();
     }
     for (const texture of materialTextures) texture.dispose();
-    this.scene.clear();
-    this.assets.dispose();
-    this.events.clear();
-    this.renderer.forceContextLoss();
-    this.renderer.dispose();
-    this.renderer.domElement.remove();
   }
 
   private readonly handleResize = (): void => this.resize();
@@ -100,6 +300,7 @@ export class Experience {
     event.preventDefault();
     this.contextLost = true;
     this.pause();
+    this.fatalHandler?.("The 3D display stopped responding. The complete text portfolio is available below.");
   };
 
   private readonly handleContextRestored = (): void => {
@@ -109,13 +310,104 @@ export class Experience {
   };
 
   private readonly renderFrame = (): void => {
-    const nextTier = this.performance.sample(this.clock.getDelta() * 1000);
-    if (nextTier) {
-      this.resize();
-      this.events.emit("quality:change", { tier: nextTier });
+    try {
+      const delta = this.clock.getDelta();
+      const nextTier = this.performance.sample(delta * 1000);
+      if (nextTier) {
+        this.resize();
+        this.events.emit("quality:change", { tier: nextTier });
+      }
+      this.updateWorld(delta);
+      this.renderer.render(this.scene, this.camera);
+    } catch (error) {
+      this.pause();
+      if (!this.fatalHandler) throw error;
+      this.fatalHandler("The 3D display could not continue. The complete text portfolio is available below.");
     }
-    this.renderer.render(this.scene, this.camera);
   };
+
+  private updateWorld(delta: number): void {
+    if (!this.world || !this.avatar || !this.controls || !this.cameraRig || !this.interaction) return;
+    const intent = this.controls.consumeFrame();
+    const x = intent.moveX + Number(this.mobileMoves.has("right")) - Number(this.mobileMoves.has("left"));
+    const z = intent.moveZ + Number(this.mobileMoves.has("back")) - Number(this.mobileMoves.has("forward"));
+    const magnitude = Math.max(1, Math.hypot(x, z));
+    const activate = this.interactRequested || (intent.interact && !this.interactHeld);
+    this.interactHeld = intent.interact;
+    this.interactRequested = false;
+    const pose = this.avatar.update({ moveX: x / magnitude, moveZ: z / magnitude,
+      interact: intent.interact || activate }, delta);
+    this.avatar.group.position.copy(this.world.constrainPosition(
+      this.avatar.group.position, this.avatar.colliderRadius));
+    this.cameraRig.setAvatarPose(this.avatar.group.position, pose.yaw);
+    this.cameraRig.orbit(intent.orbitX, intent.orbitY);
+    this.cameraRig.zoom(intent.zoom);
+    this.cameraRig.follow(this.avatar.group.position, delta);
+    this.avatar.faceCamera(this.camera.position);
+    this.theme?.update(delta);
+    this.world.update(delta);
+    this.interaction.focusNearest(this.avatar.group.position);
+    if (activate) this.interaction.activate();
+    this.interaction.update(delta);
+    this.vault?.update(delta, this.avatar.group.position, this.ui?.motionReduced);
+    this.metrics?.update(delta, this.ui?.motionReduced);
+  }
+
+  private enterZone(zone: WorldZone): void {
+    if (this.avatar && this.world && this.cameraRig) {
+      this.avatar.group.position.copy(this.world.constrainPosition(zone.entryPoint,
+        this.avatar.colliderRadius));
+      this.cameraRig.setAvatarPose(this.avatar.group.position, this.avatar.group.rotation.y);
+      this.cameraRig.transitionTo(zone.cameraComposition);
+    }
+    this.ui?.setZone(zone.id);
+    this.events.emit("zone:enter", { zoneId: zone.id });
+  }
+
+  private selectCapability(id: string): void { this.ui?.openCapability(id); }
+  private selectDomain(id: string): void { this.ui?.openDomain(id); }
+
+  private readonly handleCanvasPointerDown = (event: PointerEvent): void => {
+    this.pointerStart = { x: event.clientX, y: event.clientY };
+  };
+
+  private readonly handleCanvasClick = (event: MouseEvent): void => {
+    if (!this.interaction || this.ui?.isOverlayOpen) return;
+    if (this.pointerStart && Math.hypot(event.clientX - this.pointerStart.x,
+      event.clientY - this.pointerStart.y) > 6) return;
+    this.pointerStart = null;
+    const bounds = this.renderer.domElement.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const x = (event.clientX - bounds.left) / bounds.width * 2 - 1;
+    const y = 1 - (event.clientY - bounds.top) / bounds.height * 2;
+    if (this.interaction.point(x, y)) this.interaction.activate();
+  };
+
+  private ensureAudio(): AudioContext | null {
+    if (this.audio) return this.audio;
+    if (typeof AudioContext === "undefined") return null;
+    try { this.audio = new AudioContext(); } catch { return null; }
+    return this.audio;
+  }
+
+  private playNavigationSound(): void {
+    if (!this.soundEnabled) return;
+    const audio = this.ensureAudio();
+    if (!audio) return;
+    void audio.resume();
+    const oscillator = audio.createOscillator();
+    const gain = audio.createGain();
+    const now = audio.currentTime;
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(392, now);
+    oscillator.frequency.exponentialRampToValueAtTime(523.25, now + 0.16);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.012, now + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+    oscillator.connect(gain).connect(audio.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.21);
+  }
 
   private resize(): void {
     if (this.disposed || !this.started) return;

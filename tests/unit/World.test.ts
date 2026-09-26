@@ -1,5 +1,5 @@
 import { Raycaster, Vector3 } from "three";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { World } from "../../src/world/World";
 import { createArrivalPlaza } from "../../src/world/zones/ArrivalPlaza";
 import { createCareerTrail } from "../../src/world/zones/CareerTrail";
@@ -7,6 +7,12 @@ import { createAutomationLab } from "../../src/world/zones/AutomationLab";
 import { createEvidenceVault } from "../../src/world/zones/EvidenceVault";
 import { createRegulatoryObservatory } from "../../src/world/zones/RegulatoryObservatory";
 import { createContactPortal } from "../../src/world/zones/ContactPortal";
+
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    fillRect: vi.fn(), strokeRect: vi.fn(), fillText: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+});
 
 describe("World navigation shell", () => {
   it("keeps routes from plaza to two destinations walkable", () => {
