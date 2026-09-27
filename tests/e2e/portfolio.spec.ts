@@ -39,9 +39,9 @@ test("loads one rendered world and directly navigates every destination", async 
   await expect(page.locator("#experience canvas")).toHaveCount(1);
   await capture(page, testInfo, "arrival-night");
   for (const name of ["Automation Lab", "Evidence Vault", "Regulatory Observatory",
-    "Career Trail", "Contact Portal", "Arrival Plaza"]) {
+    "Career Experience", "Contact Portal", "Arrival Plaza"]) {
     await destination(page, name);
-    if (["Automation Lab", "Evidence Vault", "Career Trail"].includes(name))
+    if (["Automation Lab", "Evidence Vault", "Career Experience"].includes(name))
       await capture(page, testInfo, name.toLowerCase().replaceAll(" ", "-"));
   }
 });
@@ -112,12 +112,13 @@ test("Lab and Observatory interaction anchors open grounded capability details",
 });
 
 test("guided tour opens destination details and can be stopped", async ({ page }) => {
+  test.setTimeout(60_000);
   await ready(page);
   await page.getByRole("button", { name: "Start guided tour" }).click();
   await expect(page.getByRole("button", { name: "Stop guided tour" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator("[data-current-zone]")).toHaveText("Automation Lab", { timeout: 6_000 });
-  await expect(page.getByRole("dialog").getByRole("heading", { name: "Automation & engineering" }))
-    .toBeVisible({ timeout: 5_000 });
+  await expect(page.locator("[data-current-zone]")).toHaveText("Automation Lab", { timeout: 30_000 });
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Workflow analysis & product delivery" }))
+    .toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: "Stop guided tour" }).click();
   await expect(page.getByRole("button", { name: "Start guided tour" })).toHaveAttribute("aria-pressed", "false");
 });
@@ -156,7 +157,7 @@ test("opens the Evidence Vault through world interaction and paginates eleven ca
 test("opens career roles through world interaction and direct browse", async ({ page }, testInfo) => {
   test.setTimeout(210_000);
   await ready(page);
-  await destination(page, "Career Trail");
+  await destination(page, "Career Experience");
   if (testInfo.project.name === "mobile-chromium") await page.getByRole("button", { name: "Interact" }).click();
   else await page.keyboard.down("e");
   await expect(page.getByRole("dialog")).toBeVisible();

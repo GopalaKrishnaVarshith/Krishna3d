@@ -27,4 +27,14 @@ describe("ZoneManager", () => {
     expect(manager.currentZone?.id).toBe("vault");
     expect(() => manager.navigateTo("missing")).toThrow(/unknown zone/i);
   });
+
+  it("activates a destination without firing navigation callbacks", () => {
+    const onNavigate = vi.fn();
+    const manager = new ZoneManager(onNavigate);
+    const lab = zone("lab");
+    manager.register(lab);
+    expect(manager.activate("lab")).toBe(lab);
+    expect(manager.currentZone?.id).toBe("lab");
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
 });

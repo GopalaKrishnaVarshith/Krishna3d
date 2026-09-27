@@ -116,7 +116,7 @@ function bridgeRibbon(route: BridgeRoute): BufferGeometry {
     for (const side of [-1, 1]) {
       const x = center.x + normal.x * BRIDGE_HALF_WIDTH * side;
       const z = center.z + normal.z * BRIDGE_HALF_WIDTH * side;
-      positions.push(x, SURFACE_Y, z, x, -0.18, z);
+      positions.push(x, SURFACE_Y + 0.018, z, x, -0.18, z);
     }
     if (step < 36) {
       const i = step * 4;
@@ -150,9 +150,15 @@ export class World {
   private readonly capGeometry = this.ownGeometry(new SphereGeometry(0.12, 8, 6));
   private readonly foliageGeometry = this.ownGeometry(new ConeGeometry(0.42, 1.45, 7));
   private readonly shrubGeometry = this.ownGeometry(new SphereGeometry(0.4, 6, 4));
-  private readonly ground = this.ownMaterial(new MeshStandardMaterial({ color: 0xb6b9a6, roughness: 0.93 }));
+  private readonly ground = this.ownMaterial(new MeshStandardMaterial({
+    color: 0xb6b9a6, roughness: 0.93, polygonOffset: true,
+    polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+  }));
   private readonly rock = this.ownMaterial(new MeshStandardMaterial({ color: 0x435665, roughness: 1, flatShading: true }));
-  private readonly path = this.ownMaterial(new MeshStandardMaterial({ color: 0xd1c8ae, roughness: 0.88 }));
+  private readonly path = this.ownMaterial(new MeshStandardMaterial({
+    color: 0xd1c8ae, roughness: 0.88, polygonOffset: true,
+    polygonOffsetFactor: -0.5, polygonOffsetUnits: -1,
+  }));
   private readonly brass = this.ownMaterial(new MeshStandardMaterial({ color: 0xb59655, metalness: 0.68, roughness: 0.32 }));
   private readonly water = this.ownMaterial(new MeshStandardMaterial({ color: 0x17495b, metalness: 0.38, roughness: 0.38, transparent: true, opacity: 0.78, side: DoubleSide }));
   private readonly foliage = this.ownMaterial(new MeshStandardMaterial({ color: 0x32665a, roughness: 1, flatShading: true }));

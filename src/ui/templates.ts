@@ -5,7 +5,7 @@ export const DESTINATIONS = [
   { id: "automation-lab", label: "Automation Lab", hint: "Workflow and engineering" },
   { id: "evidence-vault", label: "Evidence Vault", hint: "Eleven selected projects" },
   { id: "observatory", label: "Regulatory Observatory", hint: "Regulatory data and quality" },
-  { id: "career-trail", label: "Career Trail", hint: "Eight professional roles" },
+  { id: "career-trail", label: "Career Experience", hint: "Eight professional roles" },
   { id: "contact-portal", label: "Contact Portal", hint: "Get in touch" },
 ] as const;
 

@@ -21,6 +21,10 @@ let shuttingDown = false;
 
 const ui = new UIController(uiRoot, {
   onNavigate: (id) => experience?.navigate(id),
+  onTourStart: () => experience?.startTourMusic(),
+  onTourNavigate: (id) => experience?.tourNavigate(id) ?? 900,
+  onTourFocus: (kind, id) => experience?.tourFocus(kind, id) ?? 0,
+  onTourStop: () => experience?.stopTour(),
   onThemeChange: (theme) => experience?.setTheme(theme),
   onReducedMotionChange: (reduced) => experience?.setReducedMotion(reduced),
   onSoundChange: (enabled) => experience?.setSound(enabled),

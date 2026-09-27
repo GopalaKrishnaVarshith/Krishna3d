@@ -15,7 +15,7 @@ const destinations = [
   { id: "automation-lab", angle: Math.PI, label: "Automation Lab" },
   { id: "evidence-vault", angle: -Math.PI / 2, label: "Evidence Vault" },
   { id: "observatory", angle: -0.08, label: "Regulatory Observatory" },
-  { id: "career-trail", angle: 0.94, label: "Career Trail" },
+  { id: "career-trail", angle: 0.94, label: "Career Experience" },
   { id: "contact-portal", angle: 2.2, label: "Contact Portal" },
 ];
 

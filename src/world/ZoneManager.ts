@@ -29,6 +29,13 @@ export class ZoneManager {
     return zone;
   }
 
+  activate(zoneId: string): WorldZone {
+    const zone = this.zones.get(zoneId);
+    if (!zone) throw new Error(`Unknown zone: ${zoneId}`);
+    this.active = zone;
+    return zone;
+  }
+
   update(delta: number): void { for (const zone of this.zones.values()) zone.update(delta); }
 
   dispose(): void {

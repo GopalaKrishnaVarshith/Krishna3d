@@ -149,20 +149,43 @@ describe("UIController", () => {
 
   it("runs and stops the guided tour through existing navigation and dialogs", async () => {
     vi.useFakeTimers();
-    const onNavigate = vi.fn();
-    controller = new UIController(root, { onNavigate });
+    const onTourNavigate = vi.fn(() => 0);
+    const onTourFocus = vi.fn(() => 0);
+    const onTourStart = vi.fn();
+    const onTourStop = vi.fn();
+    controller = new UIController(root, { onTourStart, onTourNavigate, onTourFocus, onTourStop });
     const tour = root.querySelector<HTMLButtonElement>("[data-tour-toggle]")!;
     tour.click();
     expect(tour.textContent).toBe("Stop tour");
     expect(tour.getAttribute("aria-pressed")).toBe("true");
-    expect(onNavigate).toHaveBeenCalledWith("plaza");
-    await vi.advanceTimersByTimeAsync(4000);
-    expect(onNavigate).toHaveBeenCalledWith("automation-lab");
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(root.querySelector('[role="dialog"]')?.textContent).toContain("Automation & engineering");
+    expect(onTourStart).toHaveBeenCalledOnce();
+    expect(onTourNavigate).toHaveBeenCalledWith("plaza");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(onTourFocus).toHaveBeenCalledWith("profile", undefined);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(root.querySelector('[role="dialog"]')?.textContent).toContain(portfolioData.profile.name);
+    await vi.advanceTimersByTimeAsync(4201);
+    expect(onTourNavigate).toHaveBeenCalledWith("automation-lab");
+    expect(root.querySelector('[role="dialog"]')?.textContent).toContain("Automation Lab");
+    await vi.advanceTimersByTimeAsync(2001);
+    expect(onTourFocus).toHaveBeenCalledWith("capability", portfolioData.skillDomains[0].id);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(root.querySelector('[role="dialog"]')?.textContent).toContain(portfolioData.skillDomains[0].title);
     tour.click();
     expect(tour.textContent).toBe("Start tour");
     expect(tour.getAttribute("aria-pressed")).toBe("false");
+    expect(onTourStop).toHaveBeenCalled();
+  });
+
+  it("finishes the guided tour with email and LinkedIn actions", async () => {
+    vi.useFakeTimers();
+    controller = new UIController(root, { onTourNavigate: () => 0, onTourFocus: () => 0 });
+    root.querySelector<HTMLButtonElement>("[data-tour-toggle]")!.click();
+    await vi.advanceTimersByTimeAsync(200_000);
+    expect(root.querySelector(".tour-end-overlay")?.textContent).toContain("Tour complete");
+    expect(root.querySelector(`a[href="mailto:${portfolioData.profile.email}"]`)).toBeTruthy();
+    expect(root.querySelector(`a[href="${portfolioData.profile.linkedin}"]`)).toBeTruthy();
+    expect(root.querySelector<HTMLButtonElement>(".tour-end-close")?.hidden).toBe(false);
   });
 
   it("sets canonical and structured metadata from the same portfolio data", () => {

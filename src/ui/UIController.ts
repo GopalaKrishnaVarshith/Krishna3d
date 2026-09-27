@@ -9,11 +9,24 @@ const THEME_KEY = "krishna-world-theme";
 const SOUND_KEY = "krishna-world-sound";
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 type MoveDirection = "forward" | "back" | "left" | "right";
+type TourFocusKind = "profile" | "section" | "capability" | "project" | "domain" | "experience" | "contact";
+
+interface TourStep {
+  zone: string;
+  kind?: TourFocusKind;
+  id?: string;
+  open?: () => void;
+  holdMs?: number;
+}
 
 export interface UIControllerOptions {
   data?: PortfolioData;
   siteUrl?: string;
   onNavigate?: (zoneId: string) => void;
+  onTourStart?: () => void;
+  onTourNavigate?: (zoneId: string) => number;
+  onTourFocus?: (kind: TourFocusKind, id?: string) => number;
+  onTourStop?: () => void;
   onThemeChange?: (theme: Theme) => void;
   onReducedMotionChange?: (reduced: boolean) => void;
   onSoundChange?: (enabled: boolean) => void;
@@ -45,8 +58,10 @@ export class UIController {
   private readonly priorInert = new Map<HTMLElement, boolean>();
   private readonly activeMoves = new Map<string, MoveDirection>();
   private tourTimer: number | null = null;
+  private tourEndCloseTimer: number | null = null;
   private tourStep = 0;
   private tourActive = false;
+  private tourZone: string | null = null;
   private fallback = false;
   private disposed = false;
 
@@ -136,6 +151,12 @@ export class UIController {
     if (domain) this.openTopic(label, domain.summary, domain.proof, domain.skills);
   }
 
+  openProfile(): void {
+    const { profile } = this.data;
+    this.openTopic(profile.name, profile.title,
+      `${profile.location} · ${profile.email}`, ["Workflow automation", "Regulatory technology", "Responsible AI"]);
+  }
+
   showFallback(reason: string): void {
     if (this.fallback) return;
     this.stopTour();
@@ -156,6 +177,7 @@ export class UIController {
 
   closeDialog(): void {
     if (!this.overlay) return;
+    this.clearTourEndCloseTimer();
     this.overlay.remove();
     this.overlay = null;
     for (const [element, inert] of this.priorInert) {
@@ -215,7 +237,7 @@ export class UIController {
       <button class="text-button" type="button" data-close aria-label="Close details">Close <span aria-hidden="true">×</span></button></div>
       <div class="detail-scroll"><h2 id="detail-title">${escapeHtml(title)}</h2>
       <p class="detail-lede">${escapeHtml(summary)}</p><p>${escapeHtml(proof)}</p>
-      <ul class="detail-tags" aria-label="Skills">${skills.map((skill) => `<li>${escapeHtml(skill)}</li>`).join("")}</ul></div></div>`;
+      ${skills.length ? `<ul class="detail-tags" aria-label="Skills">${skills.map((skill) => `<li>${escapeHtml(skill)}</li>`).join("")}</ul>` : ""}</div></div>`;
     this.openDialog(dialog, "topic", 0);
   }
 
@@ -280,9 +302,7 @@ export class UIController {
     } else if (button.hasAttribute("data-sound-toggle")) {
       this.soundEnabled = !this.soundEnabled;
       persist(SOUND_KEY, String(this.soundEnabled));
-      button.textContent = this.soundEnabled ? "Sound on" : "Sound off";
-      button.setAttribute("aria-pressed", String(this.soundEnabled));
-      button.setAttribute("aria-label", this.soundEnabled ? "Mute sound" : "Enable sound");
+      this.updateSoundButton();
       this.options.onSoundChange?.(this.soundEnabled);
     } else if (button.hasAttribute("data-fallback-toggle")) {
       this.showFallback("You chose the text version of this portfolio.");
@@ -372,14 +392,24 @@ export class UIController {
     if (this.fallback) return;
     this.tourActive = true;
     this.tourStep = 0;
+    if (!this.soundEnabled) {
+      this.soundEnabled = true;
+      persist(SOUND_KEY, String(this.soundEnabled));
+      this.updateSoundButton();
+      this.options.onSoundChange?.(true);
+    }
+    this.options.onTourStart?.();
     this.updateTourButton();
     this.runTourStep();
   }
 
   private stopTour(): void {
+    const wasActive = this.tourActive;
     if (this.tourTimer !== null) window.clearTimeout(this.tourTimer);
     this.tourTimer = null;
     this.tourActive = false;
+    this.tourZone = null;
+    if (wasActive) this.options.onTourStop?.();
     this.updateTourButton();
   }
 
@@ -389,33 +419,100 @@ export class UIController {
     const steps = this.tourSteps();
     const step = steps[this.tourStep++];
     if (!step) {
-      this.stopTour();
-      this.setContextPrompt("Tour complete. Explore any section or open the text version.");
+      this.finishTour();
       return;
     }
-    this.options.onNavigate?.(step.zone);
-    this.setZone(step.zone);
+    const travelMs = step.zone === this.tourZone ? 0 : this.walkToTourZone(step.zone);
     this.tourTimer = window.setTimeout(() => {
       if (!this.tourActive) return;
-      step.open?.();
-      this.tourTimer = window.setTimeout(() => this.runTourStep(), this.tourDelay());
-    }, 900);
+      this.tourZone = step.zone;
+      this.setZone(step.zone);
+      const focusMs = step.kind ? this.options.onTourFocus?.(step.kind, step.id) ?? 0 : 0;
+      this.tourTimer = window.setTimeout(() => {
+        if (!this.tourActive) return;
+        step.open?.();
+        this.tourTimer = window.setTimeout(() => this.runTourStep(),
+          step.holdMs ?? (step.open ? this.tourDelay() : 3200));
+      }, Math.max(0, focusMs));
+    }, Math.max(0, travelMs));
   }
 
-  private tourSteps(): Array<{ zone: string; open?: () => void }> {
+  private tourSteps(): TourStep[] {
+    const regulatoryDomains = ["rims", "document-quality", "submissions",
+      "pharmacovigilance", "data-integrity", "responsible-ai"];
+    const section = (zone: string): TourStep => ({
+      zone, kind: "section", id: zone, open: () => this.openSectionIntro(zone), holdMs: 2000,
+    });
     return [
-      { zone: "plaza" },
-      { zone: "automation-lab", open: () => this.openCapability("automation-engineering") },
-      { zone: "evidence-vault", open: () => this.openProject(this.data.projects[0].id) },
-      { zone: "observatory", open: () => this.openDomain("rims") },
-      { zone: "career-trail", open: () => this.openExperience(this.data.experience[0].id) },
-      { zone: "contact-portal" },
+      { zone: "plaza", kind: "profile", open: () => this.openProfile(), holdMs: 4200 },
+      section("automation-lab"),
+      ...this.data.skillDomains.map((item) => ({ zone: "automation-lab",
+        kind: "capability" as const, id: item.id, open: () => this.openCapability(item.id) })),
+      section("evidence-vault"),
+      ...this.data.projects.map((item) => ({ zone: "evidence-vault",
+        kind: "project" as const, id: item.id, open: () => this.openProject(item.id) })),
+      section("observatory"),
+      ...regulatoryDomains.map((id) => ({ zone: "observatory",
+        kind: "domain" as const, id, open: () => this.openDomain(id) })),
+      section("career-trail"),
+      ...this.data.experience.map((item) => ({ zone: "career-trail",
+        kind: "experience" as const, id: item.id, open: () => this.openExperience(item.id) })),
+      section("contact-portal"),
     ];
+  }
+
+  private walkToTourZone(zone: string): number {
+    const duration = this.options.onTourNavigate?.(zone);
+    if (duration !== undefined) return duration;
+    this.options.onNavigate?.(zone);
+    return 900;
   }
 
   private tourDelay(): number {
     const text = (this.overlay?.textContent || this.root.querySelector("[data-context-prompt]")?.textContent || "").trim();
-    return Math.min(4200, Math.max(3000, 2500 + text.length * 4));
+    return Math.min(5000, Math.max(3000, 2500 + text.length * 4));
+  }
+
+  private finishTour(): void {
+    this.stopTour();
+    this.setContextPrompt("Tour complete. Email Krishna or open LinkedIn.");
+    this.openTourEnd();
+  }
+
+  private openTourEnd(): void {
+    const { profile } = this.data;
+    const dialog = document.createElement("section");
+    dialog.className = "tour-end-overlay";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "tour-end-title");
+    dialog.innerHTML = `<div class="tour-end-card">
+      <p class="eyebrow">Tour complete</p>
+      <h2 id="tour-end-title">Connect for job enquiries or workflow automation.</h2>
+      <p>Email Krishna or open LinkedIn to discuss roles, automation, or regulated workflow work.</p>
+      <div class="tour-end-actions">
+        <a class="tour-end-action tour-end-action-primary" href="mailto:${escapeHtml(profile.email)}">Email for job enquiry</a>
+        <a class="tour-end-action" href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">Open LinkedIn <span aria-hidden="true">↗</span></a>
+      </div>
+      <button class="tour-end-close" type="button" data-close hidden aria-label="Close tour complete overlay">Close ×</button>
+    </div>`;
+    this.openDialog(dialog, "topic", 0);
+    dialog.querySelector<HTMLAnchorElement>(".tour-end-action")?.focus();
+    const close = dialog.querySelector<HTMLButtonElement>("[data-close]");
+    this.tourEndCloseTimer = window.setTimeout(() => {
+      if (close) close.hidden = false;
+    }, 1800);
+  }
+
+  private openSectionIntro(zone: string): void {
+    const destination = DESTINATIONS.find((item) => item.id === zone);
+    if (!destination) return;
+    this.openTopic(destination.label, destination.hint, "Opening the section details next.", []);
+  }
+
+  private clearTourEndCloseTimer(): void {
+    if (this.tourEndCloseTimer !== null) window.clearTimeout(this.tourEndCloseTimer);
+    this.tourEndCloseTimer = null;
   }
 
   private updateTourButton(): void {
@@ -424,6 +521,14 @@ export class UIController {
     button.textContent = this.tourActive ? "Stop tour" : "Start tour";
     button.setAttribute("aria-pressed", String(this.tourActive));
     button.setAttribute("aria-label", this.tourActive ? "Stop guided tour" : "Start guided tour");
+  }
+
+  private updateSoundButton(): void {
+    const button = this.root.querySelector<HTMLButtonElement>("[data-sound-toggle]");
+    if (!button) return;
+    button.textContent = this.soundEnabled ? "Sound on" : "Sound off";
+    button.setAttribute("aria-pressed", String(this.soundEnabled));
+    button.setAttribute("aria-label", this.soundEnabled ? "Mute sound" : "Enable sound");
   }
 
   private readonly handleFocusIn = (event: FocusEvent): void => {

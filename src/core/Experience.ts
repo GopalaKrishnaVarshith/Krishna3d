@@ -4,6 +4,7 @@ import {
   PerspectiveCamera,
   Scene,
   Texture,
+  Vector3,
   WebGLRenderer,
 } from "three";
 import { Avatar } from "../avatar/Avatar";
@@ -50,6 +51,13 @@ class FrameTimer {
   }
 }
 
+type TourFocusKind = "profile" | "section" | "capability" | "project" | "domain" | "experience" | "contact";
+
+interface GuidedWalk {
+  points: Vector3[];
+  onArrive?: () => void;
+}
+
 export class Experience {
   readonly renderer: WebGLRenderer;
   readonly scene = new Scene();
@@ -70,10 +78,12 @@ export class Experience {
   private vault: ProjectVault | null = null;
   private ui: UIController | null = null;
   private readonly mobileMoves = new Set<string>();
+  private guidedWalk: GuidedWalk | null = null;
   private interactRequested = false;
   private interactHeld = false;
   private soundEnabled = false;
   private audio: AudioContext | null = null;
+  private tourAudio: { gain: GainNode; oscillators: OscillatorNode[] } | null = null;
   private fatalHandler: ((reason: string) => void) | null = null;
   private pointerStart: { x: number; y: number } | null = null;
 
@@ -198,6 +208,51 @@ export class Experience {
     this.ui.openExperience(id);
   }
 
+  tourNavigate(id: string): number {
+    if (!this.world || !this.avatar) return 900;
+    const zone = this.world.zones.get(id);
+    if (!zone) return 900;
+    return this.startGuidedWalk(this.routeTo(zone.entryPoint), () => this.activateTourZone(zone));
+  }
+
+  tourFocus(kind: TourFocusKind, id?: string): number {
+    if (!this.world || !this.avatar) return 0;
+    if (kind === "profile") return this.focusTourProfile();
+    if (kind === "section") return 0;
+    if (kind === "capability" && id) return this.focusTourInteractive("automation-lab", `capability:${id}`);
+    if (kind === "domain" && id) return this.focusTourInteractive("observatory", `domain:${id}`);
+    if (kind === "project" && id) return this.focusTourProject(id);
+    if (kind === "experience" && id) return this.focusTourExperience(id);
+    return kind === "contact" ? 900 : 500;
+  }
+
+  stopTour(): void {
+    this.guidedWalk = null;
+    this.stopTourMusic();
+  }
+
+  startTourMusic(): void {
+    if (this.tourAudio) return;
+    const audio = this.ensureAudio();
+    if (!audio) return;
+    void audio.resume();
+    const gain = audio.createGain();
+    const now = audio.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.018, now + 1.2);
+    gain.connect(audio.destination);
+    const oscillators = [196, 246.94, 329.63].map((frequency, index) => {
+      const oscillator = audio.createOscillator();
+      oscillator.type = index === 1 ? "triangle" : "sine";
+      oscillator.frequency.setValueAtTime(frequency, now);
+      oscillator.detune.setValueAtTime(index * 4 - 5, now);
+      oscillator.connect(gain);
+      oscillator.start(now);
+      return oscillator;
+    });
+    this.tourAudio = { gain, oscillators };
+  }
+
   setTheme(theme: WorldTheme): void {
     this.theme?.setTheme(theme);
     this.events.emit("theme:change", { theme });
@@ -264,6 +319,7 @@ export class Experience {
     }
     this.world?.dispose();
     this.theme?.dispose();
+    this.stopTour();
     void this.audio?.close();
     this.audio = null;
     this.ui = null;
@@ -356,11 +412,119 @@ export class Experience {
     }
   };
 
+  private focusTourProject(id: string): number {
+    const zone = this.world?.zones.get("evidence-vault") as EvidenceVaultZone | undefined;
+    const capsule = zone?.capsulePositions.get(id);
+    if (!zone || !capsule) return 500;
+    const center = new Vector3(0, 0, -14);
+    const direction = capsule.clone().sub(center).setY(0);
+    if (direction.lengthSq() > 0) direction.normalize();
+    const approach = capsule.clone().addScaledVector(direction, -0.95);
+    return this.startGuidedWalk([approach], () => {
+      this.vault?.open(id);
+      const cameraPoint = zone.cameraPoints.get(id);
+      if (cameraPoint) this.cameraRig?.transitionTo({
+        position: cameraPoint,
+        target: capsule.clone().setY(1.35),
+        durationMs: 700,
+        fov: 52,
+      });
+    });
+  }
+
+  private focusTourProfile(): number {
+    return this.startGuidedWalk([new Vector3(-2.15, 0, 2.15)], () => {
+      this.cameraRig?.transitionTo({
+        position: new Vector3(-3.8, 2.5, 6.2),
+        target: new Vector3(-2.55, 1.05, 1.25),
+        durationMs: 650,
+        fov: 46,
+      });
+    });
+  }
+
+  private focusTourInteractive(zoneId: string, targetId: string): number {
+    const zone = this.world?.zones.get(zoneId);
+    const target = zone?.interactiveObjects.find((item) => item.id === targetId);
+    if (!target || !this.avatar) return 500;
+    const point = new Vector3();
+    target.object.getWorldPosition(point);
+    point.y = 0;
+    const direction = point.clone().sub(this.avatar.group.position).setY(0);
+    if (direction.lengthSq() > 0) direction.normalize();
+    return this.startGuidedWalk([point.clone().addScaledVector(direction, -1.05)]);
+  }
+
+  private focusTourExperience(id: string): number {
+    const trail = this.world?.zones.get("career-trail") as CareerTrailZone | undefined;
+    const point = trail?.milestoneViewingPoints.get(id);
+    const composition = trail?.milestoneCameras.get(id);
+    if (!point) return 500;
+    return this.startGuidedWalk([point], () => {
+      if (composition) this.cameraRig?.transitionTo(composition);
+    });
+  }
+
+  private startGuidedWalk(points: Vector3[], onArrive?: () => void): number {
+    if (!this.avatar) { onArrive?.(); return 0; }
+    const clean = points.map((point) => point.clone().setY(0))
+      .filter((point) => point.distanceToSquared(this.avatar!.group.position) > 0.16);
+    if (!clean.length) { onArrive?.(); return 0; }
+    this.guidedWalk = { points: clean, onArrive };
+    return this.estimateWalkMs(clean);
+  }
+
+  private routeTo(target: Vector3): Vector3[] {
+    if (!this.avatar) return [target.clone()];
+    const center = new Vector3(0, 0, 0);
+    const points: Vector3[] = [];
+    if (target.distanceTo(center) > 6 && this.avatar.group.position.distanceTo(center) > 1.2)
+      points.push(center);
+    points.push(target.clone());
+    return points;
+  }
+
+  private estimateWalkMs(points: Vector3[]): number {
+    if (!this.avatar) return 0;
+    let previous = this.avatar.group.position;
+    let distance = 0;
+    for (const point of points) {
+      distance += previous.distanceTo(point);
+      previous = point;
+    }
+    return Math.max(900, Math.ceil(distance / 1.65 * 1000 + 650));
+  }
+
+  private guidedInput(): { x: number; z: number } | null {
+    if (!this.guidedWalk || !this.avatar) return null;
+    const position = this.avatar.group.position;
+    while (this.guidedWalk.points.length) {
+      const target = this.guidedWalk.points[0];
+      const dx = target.x - position.x;
+      const dz = target.z - position.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > 0.36) return { x: dx / distance, z: dz / distance };
+      this.guidedWalk.points.shift();
+    }
+    const onArrive = this.guidedWalk.onArrive;
+    this.guidedWalk = null;
+    onArrive?.();
+    return { x: 0, z: 0 };
+  }
+
+  private activateTourZone(zone: WorldZone): void {
+    this.world?.zones.activate(zone.id);
+    this.cameraRig?.transitionTo(zone.cameraComposition);
+    this.ui?.setZone(zone.id);
+    this.events.emit("zone:enter", { zoneId: zone.id });
+  }
+
   private updateWorld(delta: number): void {
     if (!this.world || !this.avatar || !this.controls || !this.cameraRig || !this.interaction) return;
     const intent = this.controls.consumeFrame();
-    const x = intent.moveX + Number(this.mobileMoves.has("right")) - Number(this.mobileMoves.has("left"));
-    const z = intent.moveZ + Number(this.mobileMoves.has("back")) - Number(this.mobileMoves.has("forward"));
+    const guided = this.guidedInput();
+    const x = guided?.x ?? intent.moveX + Number(this.mobileMoves.has("right")) - Number(this.mobileMoves.has("left"));
+    const z = guided?.z ?? intent.moveZ + Number(this.mobileMoves.has("back")) - Number(this.mobileMoves.has("forward"));
     const magnitude = Math.max(1, Math.hypot(x, z));
     const activate = this.interactRequested || (intent.interact && !this.interactHeld);
     this.interactHeld = intent.interact;
@@ -424,6 +588,22 @@ export class Experience {
     if (typeof AudioContext === "undefined") return null;
     try { this.audio = new AudioContext(); } catch { return null; }
     return this.audio;
+  }
+
+  private stopTourMusic(): void {
+    if (!this.tourAudio) return;
+    const { gain, oscillators } = this.tourAudio;
+    const audio = this.audio;
+    const now = audio?.currentTime ?? 0;
+    try {
+      if (audio) gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+      for (const oscillator of oscillators) oscillator.stop(audio ? now + 0.38 : undefined);
+    } catch { /* Stopping already-stopped oscillators is harmless. */ }
+    window.setTimeout(() => {
+      gain.disconnect();
+      for (const oscillator of oscillators) oscillator.disconnect();
+    }, 450);
+    this.tourAudio = null;
   }
 
   private playNavigationSound(): void {

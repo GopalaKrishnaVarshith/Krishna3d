@@ -1,5 +1,5 @@
 import type { ExperienceRole, Project } from "../data/types";
-import { escapeHtml } from "./templates";
+import { assetUrl, escapeHtml } from "./templates";
 
 function tags(items: string[]): string {
   return `<ul class="detail-tags" aria-label="Skills">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
@@ -31,7 +31,8 @@ export function renderProjectOverlay(project: Project, index: number, total: num
 }
 
 export function renderExperienceOverlay(role: ExperienceRole, index: number, total: number): HTMLElement {
-  const body = `<p class="detail-lede">${escapeHtml(role.description)}</p>
+  const logo = role.logo ? `<img class="detail-logo" src="${escapeHtml(assetUrl(role.logo))}" alt="${escapeHtml(role.company)} logo" loading="lazy">` : "";
+  const body = `${logo}<p class="detail-lede">${escapeHtml(role.description)}</p>
     <p class="detail-period">${escapeHtml(role.period)} · ${escapeHtml(role.location)}</p>
     <section class="detail-highlights"><h3>Selected work</h3><ul>${role.highlights.map((highlight) => `<li>${escapeHtml(highlight)}</li>`).join("")}</ul></section>${tags(role.skills)}`;
   return shell(role.company, role.role, body, index, total);
