@@ -175,3 +175,19 @@ The final capture log `task-7-round2-final.json` has **16 captures, zero page er
 - Generated images are conceptual and cannot by themselves verify exact metric values, text, avatar likeness at runtime, geometry count, accessibility or frame rate.
 - The arrival pair closely matches in composition, though generative lighting changes introduce small per-pixel differences. Implement both states from one Three.js geometry set.
 - The turnaround is intentionally polished and smoother than the target mesh. Treat its identity, proportions and clothing as binding; construct a controlled low-poly silhouette in code.
+
+## Task 12 final release visual QA (2026-09-27)
+
+Final browser evidence lives in `../.superpowers/sdd/2026-09-24-krishna-three-portfolio/task-12-evidence/release-*.png`. The set covers desktop night arrival, desktop daylight arrival, avatar close view, Automation Lab, Evidence Vault, Career Trail, project overlay, and mobile controls. These captures were made from the local Vite app, not from static concept images.
+
+| Area checked | Final read |
+|---|---|
+| Arrival night and day | The runtime keeps the concept's bridge-to-plaza composition, avatar-centered entry, Lab left, Vault center, Observatory right, brass practicals, teal route lights, mountains, clouds, water, and same-geometry day/night switch. It is intentionally lower-poly and less planted than the concept renders. |
+| Avatar | The final close view shows the full head, hair, glasses, beard, navy suit, white shirt, and brown shoes without the earlier cropped-head problem. The avatar remains a browser-optimized view-textured 3D character rather than a fully sculpted realtime human model. |
+| Automation Lab | Final fix moved the Lab entry point to a clear front apron and widened the Lab camera. The shot now shows the avatar, pavilion, four workflow signs, consoles, and bridge context without hiding the character behind a column. |
+| Evidence Vault | The Vault shows the central prism, eleven project capsule motifs, full avatar, open approach, and readable interaction prompt. It preserves the concept's evidence-chamber idea with simpler procedural geometry. |
+| Career Trail | The trail shows numbered role steles, logo plates, company and role text, route arrows, surrounding islands, and the avatar beside the path. Long text requires the detail overlay for full reading, which is expected for this scale. |
+| Project overlay | The project dialog is readable over a blurred world, exposes item count, challenge, response, outcome, tags, and previous/next navigation. |
+| Mobile | The Pixel-sized capture shows the avatar, world, horizontal destination rail, browse buttons, quick links, movement pad, directional controls, and interact button without horizontal overflow. |
+
+No remaining visual blockers are known. Remaining differences from the production concepts are intentional: lower-poly browser art, fewer plants and micro-details, simpler water/material response, and a view-textured avatar rather than a fully sculpted character rig. The full verification suite and build remain the release gate.

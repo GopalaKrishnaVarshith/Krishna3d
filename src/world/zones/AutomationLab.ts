@@ -187,9 +187,9 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Automat
     const x = 2.55 - index * 1.69;
     for (const offset of [-0.5, 0.5])
       kit.beam(`workflow ${label.toLowerCase()} sign hanger ${offset}`,
-        [x + offset, 3.34, 2.55], [x + offset, 2.98, 2.62], 0.026, p.brass);
+        [x + offset, 3.42, 2.55], [x + offset, 3.16, 2.62], 0.026, p.brass);
     kit.text(`workflow ${label.toLowerCase()} stage label`, [`0${index + 1}  ${label}`],
-      1.31, 0.34, [x, 2.78, 2.62], kit.group,
+      1.31, 0.34, [x, 3.0, 2.62], kit.group,
       { background: "#123644", foreground: "#eff8f1", accent: "#6ac6d0", fontSize: 83 });
   });
   for (const [index, x, material] of [
@@ -275,9 +275,9 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Automat
   kit.optimizeDrawCalls();
   return {
     id: "automation-lab", group: kit.group,
-    entryPoint: new Vector3(-9.55, 0, 0),
-    cameraComposition: { position: new Vector3(-9.0, 3.5, 6.5),
-      target: new Vector3(-13, 1.5, 0), durationMs: 1050, fov: 55 },
+    entryPoint: new Vector3(-13, 0, 0),
+    cameraComposition: { position: new Vector3(-13, 7.6, 15.2),
+      target: new Vector3(-13, 0.7, 0), durationMs: 1050, fov: 72 },
     workflowComposition: { position: new Vector3(-13, 4, 7.2),
       target: new Vector3(-13, 1.3, 0), durationMs: 700, fov: 60 },
     interactiveObjects: interactives,
