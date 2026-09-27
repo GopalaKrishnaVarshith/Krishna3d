@@ -87,11 +87,21 @@ describe("Experience", () => {
 
   it("pauses on context loss and resumes after restoration", () => {
     const { renderer, experience } = createExperience();
+    const fatal = vi.fn();
+    const setContextPrompt = vi.fn();
+    experience.setFatalHandler(fatal);
+    (experience as unknown as { ui: { setContextPrompt: (prompt: string) => void } }).ui = {
+      setContextPrompt,
+    };
     experience.start();
     const lost = new Event("webglcontextlost", { cancelable: true });
     renderer.domElement.dispatchEvent(lost);
     expect(lost.defaultPrevented).toBe(true);
     expect(renderer.setAnimationLoop).toHaveBeenLastCalledWith(null);
+    expect(fatal).not.toHaveBeenCalled();
+    expect(setContextPrompt).toHaveBeenCalledWith(
+      "3D renderer paused. Restoring the scene when graphics return.",
+    );
 
     renderer.domElement.dispatchEvent(new Event("webglcontextrestored"));
     expect(renderer.setAnimationLoop).toHaveBeenCalledTimes(3);
@@ -102,12 +112,19 @@ describe("Experience", () => {
   it("pauses while the page is hidden and resumes when visible", () => {
     const originalHidden = Object.getOwnPropertyDescriptor(document, "hidden");
     const { renderer, experience } = createExperience();
+    const setContextPrompt = vi.fn();
+    (experience as unknown as { ui: { setContextPrompt: (prompt: string) => void } }).ui = {
+      setContextPrompt,
+    };
     try {
       Object.defineProperty(document, "hidden", { configurable: true, value: false });
       experience.start();
       Object.defineProperty(document, "hidden", { configurable: true, value: true });
       document.dispatchEvent(new Event("visibilitychange"));
       expect(renderer.setAnimationLoop).toHaveBeenLastCalledWith(null);
+      expect(setContextPrompt).toHaveBeenCalledWith(
+        "3D renderer paused while the tab is in the background.",
+      );
 
       Object.defineProperty(document, "hidden", { configurable: true, value: false });
       document.dispatchEvent(new Event("visibilitychange"));

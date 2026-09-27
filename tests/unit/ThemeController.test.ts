@@ -27,7 +27,23 @@ describe("ThemeController", () => {
     expect(controller.ambient.intensity).toBe(THEME_PALETTES.day.ambientIntensity);
     expect(controller.key.color.getHex()).toBe(THEME_PALETTES.day.key);
     expect(controller.key.intensity).toBe(THEME_PALETTES.day.keyIntensity);
+    expect(controller.key.shadow.mapSize.width).toBe(2048);
     expect(storage.setItem).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+
+  it("reduces shadow resolution when adaptive quality drops", () => {
+    const scene = new Scene();
+    const controller = new ThemeController(scene, { storage: memoryStorage() });
+
+    controller.setQualityTier("balanced");
+    expect(controller.key.shadow.mapSize.width).toBe(1024);
+    expect(controller.key.shadow.mapSize.height).toBe(1024);
+    expect(controller.key.shadow.needsUpdate).toBe(true);
+
+    controller.setQualityTier("low");
+    expect(controller.key.shadow.mapSize.width).toBe(512);
+    expect(controller.key.shadow.mapSize.height).toBe(512);
     controller.dispose();
   });
 

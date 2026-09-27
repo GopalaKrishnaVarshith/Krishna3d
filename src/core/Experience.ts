@@ -1,6 +1,5 @@
 import {
   BufferGeometry,
-  Clock,
   Material,
   PerspectiveCamera,
   Scene,
@@ -27,11 +26,35 @@ import { AssetManager } from "./AssetManager";
 import { EventBus, type ExperienceEvents } from "./EventBus";
 import { PerformanceManager } from "./PerformanceManager";
 
+class FrameTimer {
+  private running = false;
+  private previous = 0;
+
+  constructor(private readonly now = () => performance.now()) {}
+
+  start(): void {
+    this.previous = this.now();
+    this.running = true;
+  }
+
+  stop(): void {
+    this.running = false;
+  }
+
+  getDelta(): number {
+    if (!this.running) return 0;
+    const current = this.now();
+    const delta = (current - this.previous) / 1000;
+    this.previous = current;
+    return Math.max(0, Math.min(delta, 0.1));
+  }
+}
+
 export class Experience {
   readonly renderer: WebGLRenderer;
   readonly scene = new Scene();
   readonly camera = new PerspectiveCamera(55, 1, 0.1, 200);
-  readonly clock = new Clock(false);
+  readonly clock = new FrameTimer();
   readonly events = new EventBus<ExperienceEvents>();
   readonly assets = new AssetManager();
   readonly performance = new PerformanceManager();
@@ -292,21 +315,27 @@ export class Experience {
   private readonly handleResize = (): void => this.resize();
 
   private readonly handleVisibilityChange = (): void => {
-    if (document.hidden) this.pause();
-    else this.resume();
+    if (document.hidden) {
+      this.pause();
+      this.ui?.setContextPrompt("3D renderer paused while the tab is in the background.");
+    } else {
+      this.resume();
+      this.restoreContextPrompt();
+    }
   };
 
   private readonly handleContextLost = (event: Event): void => {
     event.preventDefault();
     this.contextLost = true;
     this.pause();
-    this.fatalHandler?.("The 3D display stopped responding. The complete text portfolio is available below.");
+    this.ui?.setContextPrompt("3D renderer paused. Restoring the scene when graphics return.");
   };
 
   private readonly handleContextRestored = (): void => {
     this.contextLost = false;
     this.resize();
     this.resume();
+    this.restoreContextPrompt();
   };
 
   private readonly renderFrame = (): void => {
@@ -314,6 +343,7 @@ export class Experience {
       const delta = this.clock.getDelta();
       const nextTier = this.performance.sample(delta * 1000);
       if (nextTier) {
+        this.theme?.setQualityTier(nextTier);
         this.resize();
         this.events.emit("quality:change", { tier: nextTier });
       }
@@ -366,6 +396,12 @@ export class Experience {
 
   private selectCapability(id: string): void { this.ui?.openCapability(id); }
   private selectDomain(id: string): void { this.ui?.openDomain(id); }
+
+  private restoreContextPrompt(): void {
+    const id = this.world?.zones.currentZone?.id;
+    const hint = DESTINATIONS.find((destination) => destination.id === id)?.hint;
+    if (hint) this.ui?.setContextPrompt(hint);
+  }
 
   private readonly handleCanvasPointerDown = (event: PointerEvent): void => {
     this.pointerStart = { x: event.clientX, y: event.clientY };

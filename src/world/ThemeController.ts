@@ -2,6 +2,7 @@ import {
   AmbientLight, Color, DirectionalLight, FogExp2, Material, MeshStandardMaterial, PointLight,
   Object3D, Scene,
 } from "three";
+import type { QualityTier } from "../core/PerformanceManager";
 
 export type WorldTheme = "night" | "day";
 
@@ -45,6 +46,11 @@ export const THEME_PALETTES: Record<WorldTheme, ThemePalette> = {
 };
 
 export const THEME_STORAGE_KEY = "krishna-world-theme";
+const SHADOW_MAP_SIZE: Record<QualityTier, number> = {
+  high: 2048,
+  balanced: 1024,
+  low: 512,
+};
 
 interface ThemeOptions {
   storage?: Pick<Storage, "getItem" | "setItem">;
@@ -102,6 +108,7 @@ export class ThemeController {
   private elapsed = 0;
   private transitioning = false;
   private currentTheme: WorldTheme;
+  private qualityTier: QualityTier = "high";
 
   constructor(private readonly scene: Scene, options: ThemeOptions = {}) {
     this.storage = options.storage ?? browserStorage();
@@ -120,7 +127,7 @@ export class ThemeController {
     this.key.position.set(-12, 22, 9);
     this.rim.position.set(9, 11, -13);
     this.key.castShadow = true;
-    this.key.shadow.mapSize.set(2048, 2048);
+    this.applyShadowQuality();
     this.key.shadow.camera.left = -32;
     this.key.shadow.camera.right = 32;
     this.key.shadow.camera.top = 32;
@@ -224,6 +231,11 @@ export class ThemeController {
     }
   }
 
+  setQualityTier(tier: QualityTier): void {
+    this.qualityTier = tier;
+    this.applyShadowQuality();
+  }
+
   update(delta: number): void {
     if (!this.transitioning) return;
     this.elapsed += Math.max(0, Number.isFinite(delta) ? delta : 0);
@@ -291,6 +303,12 @@ export class ThemeController {
     for (const binding of this.bindings.values()) this.applyMaterialExact(binding, theme);
     for (const [light, state] of this.practicals) light.intensity = state[theme];
     if (typeof document !== "undefined") document.documentElement.dataset.theme = theme;
+  }
+
+  private applyShadowQuality(): void {
+    const size = SHADOW_MAP_SIZE[this.qualityTier];
+    this.key.shadow.mapSize.set(size, size);
+    this.key.shadow.needsUpdate = true;
   }
 
   private applyMaterialExact(binding: MaterialBinding, theme: WorldTheme): void {

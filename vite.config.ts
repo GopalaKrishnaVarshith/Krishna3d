@@ -22,6 +22,20 @@ export default defineConfig(({ command, mode }) => {
   return {
     base: command === "build" ? metadata.basePath : "/",
     plugins: [siteMetadataPlugin],
+    build: {
+      chunkSizeWarningLimit: 650,
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              { name: "three", test: /node_modules[\\/]three[\\/]/ },
+              { name: "world", test: /[\\/]src[\\/]world[\\/]/ },
+              { name: "avatar", test: /[\\/]src[\\/]avatar[\\/]/ },
+            ],
+          },
+        },
+      },
+    },
     test: {
       environment: "jsdom",
       environmentOptions: {

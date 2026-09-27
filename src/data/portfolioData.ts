@@ -1,4 +1,4 @@
-import type { ExperienceRole, PortfolioData, Project, SkillDomain } from "./types";
+import type { ExperienceRole, PortfolioData, Project, SkillDomain } from "./types.ts";
 
 const skillDomains: SkillDomain[] = [
   {

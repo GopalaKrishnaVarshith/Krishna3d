@@ -1,10 +1,15 @@
 export type QualityTier = "high" | "balanced" | "low";
+export interface QualitySettings {
+  pixelRatioCap: number;
+  shadowMapSize: number;
+  animatedDetailScale: number;
+}
 
 const QUALITY_TIERS: readonly QualityTier[] = ["high", "balanced", "low"];
-const PIXEL_RATIO_CAPS: Record<QualityTier, number> = {
-  high: 1.75,
-  balanced: 1.35,
-  low: 1,
+const QUALITY_SETTINGS: Record<QualityTier, QualitySettings> = {
+  high: { pixelRatioCap: 1.75, shadowMapSize: 2048, animatedDetailScale: 1 },
+  balanced: { pixelRatioCap: 1.35, shadowMapSize: 1024, animatedDetailScale: 0.72 },
+  low: { pixelRatioCap: 1, shadowMapSize: 512, animatedDetailScale: 0.45 },
 };
 const SLOW_FRAME_MS = 1000 / 45;
 const FAST_FRAME_MS = 1000 / 58;
@@ -21,7 +26,11 @@ export class PerformanceManager {
   }
 
   get pixelRatioCap(): number {
-    return PIXEL_RATIO_CAPS[this.tier];
+    return this.settings.pixelRatioCap;
+  }
+
+  get settings(): QualitySettings {
+    return QUALITY_SETTINGS[this.tier];
   }
 
   sample(deltaMs: number): QualityTier | null {

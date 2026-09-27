@@ -6,6 +6,7 @@ describe("PerformanceManager", () => {
     const manager = new PerformanceManager();
     expect(manager.tier).toBe("high");
     expect(manager.pixelRatioCap).toBe(1.75);
+    expect(manager.settings).toEqual({ pixelRatioCap: 1.75, shadowMapSize: 2048, animatedDetailScale: 1 });
 
     for (let frame = 0; frame < 179; frame += 1) {
       expect(manager.sample(24)).toBeNull();
@@ -14,6 +15,7 @@ describe("PerformanceManager", () => {
     expect(manager.sample(24)).toBe("balanced");
     expect(manager.tier).toBe("balanced");
     expect(manager.pixelRatioCap).toBe(1.35);
+    expect(manager.settings.shadowMapSize).toBe(1024);
   });
 
   it("resets the slow streak when a frame reaches 45 FPS", () => {
@@ -30,6 +32,7 @@ describe("PerformanceManager", () => {
     for (let frame = 0; frame < 179; frame += 1) manager.sample(30);
     expect(manager.sample(30)).toBe("low");
     expect(manager.pixelRatioCap).toBe(1);
+    expect(manager.settings).toEqual({ pixelRatioCap: 1, shadowMapSize: 512, animatedDetailScale: 0.45 });
     expect(manager.sample(30)).toBeNull();
   });
 

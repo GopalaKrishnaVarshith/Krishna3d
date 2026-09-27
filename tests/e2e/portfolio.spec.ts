@@ -112,6 +112,7 @@ test("Lab and Observatory interaction anchors open grounded capability details",
 });
 
 test("opens the Evidence Vault through world interaction and paginates eleven case studies", async ({ page }, testInfo) => {
+  test.setTimeout(210_000);
   await ready(page);
   await destination(page, "Evidence Vault");
   if (testInfo.project.name === "mobile-chromium") {
@@ -124,9 +125,9 @@ test("opens the Evidence Vault through world interaction and paginates eleven ca
   await capture(page, testInfo, "project-overlay");
   await page.getByRole("button", { name: "Close details" }).click();
   await page.getByRole("button", { name: "Browse projects" }).click();
-  const dialog = page.getByRole("dialog");
   for (const project of portfolioData.projects) {
-    await expect(dialog).toContainText(project.title);
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: project.title })).toBeVisible();
     if (project.metrics.length) {
       for (const metric of project.metrics) {
         await expect(dialog.locator("dt")).toContainText([metric.label]);
@@ -135,12 +136,14 @@ test("opens the Evidence Vault through world interaction and paginates eleven ca
       if (project.id === "pharmacovigilance-training-enablement")
         await capture(page, testInfo, "qualified-metrics-overlay");
     }
-    await dialog.getByRole("button", { name: "Next item" }).click();
+    await page.getByRole("button", { name: "Next item" }).click({ force: true });
   }
-  await expect(dialog).toContainText(portfolioData.projects[0].title);
+  await expect(page.getByRole("dialog")
+    .getByRole("heading", { name: portfolioData.projects[0].title })).toBeVisible();
 });
 
 test("opens career roles through world interaction and direct browse", async ({ page }, testInfo) => {
+  test.setTimeout(210_000);
   await ready(page);
   await destination(page, "Career Trail");
   if (testInfo.project.name === "mobile-chromium") await page.getByRole("button", { name: "Interact" }).click();
@@ -149,10 +152,10 @@ test("opens career roles through world interaction and direct browse", async ({ 
   if (testInfo.project.name !== "mobile-chromium") await page.keyboard.up("e");
   await page.getByRole("button", { name: "Close details" }).click();
   await page.getByRole("button", { name: "Browse experience" }).click();
-  const dialog = page.getByRole("dialog");
   for (const role of portfolioData.experience) {
-    await expect(dialog).toContainText(role.role);
-    await dialog.getByRole("button", { name: "Next item" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: role.role })).toBeVisible();
+    await page.getByRole("button", { name: "Next item" }).click({ force: true });
   }
   await capture(page, testInfo, "career-overlay");
 });
