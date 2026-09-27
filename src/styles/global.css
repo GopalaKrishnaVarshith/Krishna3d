@@ -31,6 +31,17 @@ body {
   overscroll-behavior: none;
 }
 
+html.fallback-active,
+html.fallback-active body,
+html.fallback-active #app {
+  height: auto;
+  overflow-y: auto;
+}
+
+html.fallback-active body {
+  overscroll-behavior: auto;
+}
+
 button,
 input,
 textarea,

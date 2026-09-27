@@ -14,6 +14,9 @@ beforeEach(() => {
 afterEach(() => {
   controller?.dispose();
   document.body.style.overflow = "";
+  document.documentElement.style.overflow = "";
+  document.documentElement.classList.remove("fallback-active");
+  vi.useRealTimers();
 });
 
 describe("UIController", () => {
@@ -144,6 +147,24 @@ describe("UIController", () => {
     expect(onProjectSelect).toHaveBeenCalledWith(portfolioData.projects[1].id);
   });
 
+  it("runs and stops the guided tour through existing navigation and dialogs", async () => {
+    vi.useFakeTimers();
+    const onNavigate = vi.fn();
+    controller = new UIController(root, { onNavigate });
+    const tour = root.querySelector<HTMLButtonElement>("[data-tour-toggle]")!;
+    tour.click();
+    expect(tour.textContent).toBe("Stop tour");
+    expect(tour.getAttribute("aria-pressed")).toBe("true");
+    expect(onNavigate).toHaveBeenCalledWith("plaza");
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(onNavigate).toHaveBeenCalledWith("automation-lab");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(root.querySelector('[role="dialog"]')?.textContent).toContain("Automation & engineering");
+    tour.click();
+    expect(tour.textContent).toBe("Start tour");
+    expect(tour.getAttribute("aria-pressed")).toBe("false");
+  });
+
   it("sets canonical and structured metadata from the same portfolio data", () => {
     controller = new UIController(root, { siteUrl: "https://example.org/portfolio" });
     expect(document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe("https://example.org/portfolio/");
@@ -166,6 +187,8 @@ describe("UIController", () => {
     expect(root.querySelector(`a[href="${portfolioData.profile.publication.url}"]`)).toBeTruthy();
     expect(document.querySelector("#experience")?.getAttribute("aria-hidden")).toBe("true");
     expect(document.activeElement?.id).toBe("fallback-title");
+    expect(document.documentElement.classList.contains("fallback-active")).toBe(true);
+    expect(document.documentElement.style.overflow).toBe("auto");
   });
 
   it("keeps the selected day theme when switching to the text fallback", () => {

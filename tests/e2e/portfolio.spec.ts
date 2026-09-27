@@ -111,6 +111,17 @@ test("Lab and Observatory interaction anchors open grounded capability details",
   await page.keyboard.up("e");
 });
 
+test("guided tour opens destination details and can be stopped", async ({ page }) => {
+  await ready(page);
+  await page.getByRole("button", { name: "Start guided tour" }).click();
+  await expect(page.getByRole("button", { name: "Stop guided tour" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-current-zone]")).toHaveText("Automation Lab", { timeout: 6_000 });
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Automation & engineering" }))
+    .toBeVisible({ timeout: 5_000 });
+  await page.getByRole("button", { name: "Stop guided tour" }).click();
+  await expect(page.getByRole("button", { name: "Start guided tour" })).toHaveAttribute("aria-pressed", "false");
+});
+
 test("opens the Evidence Vault through world interaction and paginates eleven case studies", async ({ page }, testInfo) => {
   test.setTimeout(210_000);
   await ready(page);
@@ -183,6 +194,8 @@ test("chosen text version contains all work and links", async ({ page }) => {
   await expect(page.locator("#experience")).toBeHidden();
   await expect(page.locator("#projects")).toBeVisible();
   await expect(page.locator("#contact a[href^='mailto:']")).toBeVisible();
+  await page.mouse.wheel(0, 900);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
 });
 
 test("unavailable WebGL switches to complete semantic fallback", async ({ page }) => {

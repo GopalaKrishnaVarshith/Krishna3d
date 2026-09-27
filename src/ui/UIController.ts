@@ -44,6 +44,9 @@ export class UIController {
   private priorOverflow = "";
   private readonly priorInert = new Map<HTMLElement, boolean>();
   private readonly activeMoves = new Map<string, MoveDirection>();
+  private tourTimer: number | null = null;
+  private tourStep = 0;
+  private tourActive = false;
   private fallback = false;
   private disposed = false;
 
@@ -135,6 +138,7 @@ export class UIController {
 
   showFallback(reason: string): void {
     if (this.fallback) return;
+    this.stopTour();
     this.releaseMoves();
     this.closeDialog();
     this.options.onFallback?.();
@@ -145,6 +149,7 @@ export class UIController {
     world?.setAttribute("aria-hidden", "true");
     if (world) world.hidden = true;
     document.documentElement.classList.add("fallback-active");
+    document.documentElement.style.overflow = "auto";
     document.body.style.overflow = "auto";
     this.root.querySelector<HTMLElement>("#fallback-title")?.focus();
   }
@@ -166,6 +171,7 @@ export class UIController {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.stopTour();
     this.releaseMoves();
     this.closeDialog();
     this.root.removeEventListener("click", this.handleClick);
@@ -179,6 +185,7 @@ export class UIController {
     window.removeEventListener("blur", this.releaseMoves);
     if (this.fallback) {
       document.documentElement.classList.remove("fallback-active");
+      document.documentElement.style.overflow = "";
       this.root.classList.remove("is-fallback");
       const world = document.querySelector<HTMLElement>("#experience");
       if (world) { world.hidden = false; world.removeAttribute("aria-hidden"); }
@@ -192,7 +199,7 @@ export class UIController {
       <a class="skip-link" href="#portfolio-navigation">Skip to destinations</a>
       <header class="ui-header"><div class="ui-identity"><span class="ui-monogram" aria-hidden="true">KV</span><div><strong>${escapeHtml(profile.name)}</strong><span data-current-zone>Arrival Plaza</span></div></div><div class="ui-header-actions"><button type="button" data-theme-toggle aria-label="Switch to ${this.theme === "night" ? "day" : "night"} theme">${this.theme === "night" ? "Day" : "Night"} mode</button><button type="button" data-sound-toggle aria-pressed="${this.soundEnabled}" aria-label="${this.soundEnabled ? "Mute" : "Enable"} sound">Sound ${this.soundEnabled ? "on" : "off"}</button><button type="button" data-motion-toggle aria-pressed="${this.reducedMotion}" aria-label="${this.reducedMotion ? "Enable" : "Reduce"} motion">${this.reducedMotion ? "Motion off" : "Reduce motion"}</button></div></header>
       <nav id="portfolio-navigation" class="ui-navigation" aria-label="Destinations"><span class="eyebrow">Explore the world</span><ol>${DESTINATIONS.map((destination, index) => `<li><button type="button" data-zone-target="${destination.id}" ${index === 0 ? 'aria-current="location"' : ""}><span class="nav-number">${String(index + 1).padStart(2, "0")}</span><span>${escapeHtml(destination.label)}</span></button></li>`).join("")}</ol><div class="ui-browse"><button type="button" data-browse-projects>Browse projects</button><button type="button" data-browse-experience>Browse experience</button></div></nav>
-      <div class="ui-footer"><p class="ui-prompt"><span class="prompt-mark" aria-hidden="true">✦</span><span data-context-prompt>Meet Krishna and choose a path</span></p><div class="ui-quick-links"><a href="mailto:${escapeHtml(profile.email)}">Email</a><a href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span></a><button type="button" data-fallback-toggle>Text version</button></div></div>
+      <div class="ui-footer"><p class="ui-prompt"><span class="prompt-mark" aria-hidden="true">✦</span><span data-context-prompt>Meet Krishna and choose a path</span></p><div class="ui-quick-links"><a href="mailto:${escapeHtml(profile.email)}">Email</a><a href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span></a><button type="button" data-tour-toggle aria-pressed="false" aria-label="Start guided tour">Start tour</button><button type="button" data-fallback-toggle>Text version</button></div></div>
       <div class="mobile-controls" role="group" aria-label="Move in the world"><div class="mobile-touch-pad"></div><button type="button" data-move="left" aria-label="Move left">←</button><button type="button" data-move="forward" aria-label="Move forward">↑</button><button type="button" data-move="back" aria-label="Move back">↓</button><button type="button" data-move="right" aria-label="Move right">→</button><button type="button" data-interact aria-label="Interact">✦</button></div>
       <div class="loading-screen" data-loading role="status" aria-label="Loading portfolio"><div class="loading-inner"><span class="eyebrow">Entering the world</span><strong>${escapeHtml(profile.name)}</strong><p>Building your view of the work.</p><progress max="100" value="0" aria-label="Loading progress"></progress><span data-loading-number>0%</span></div></div>`;
   }
@@ -239,6 +246,8 @@ export class UIController {
     if (!(target instanceof Element)) return;
     const button = target.closest<HTMLElement>("button, [data-close]");
     if (!button) return;
+    if (button.hasAttribute("data-tour-toggle")) { this.toggleTour(); return; }
+    if (this.tourActive) this.stopTour();
     if (button.hasAttribute("data-close")) { this.closeDialog(); return; }
     const zone = button.dataset.zoneTarget;
     if (zone) { this.options.onNavigate?.(zone); this.setZone(zone); return; }
@@ -353,6 +362,69 @@ export class UIController {
     this.activeMoves.clear();
     for (const direction of directions) this.options.onMove?.(direction, false);
   };
+
+  private toggleTour(): void {
+    if (this.tourActive) this.stopTour();
+    else this.startTour();
+  }
+
+  private startTour(): void {
+    if (this.fallback) return;
+    this.tourActive = true;
+    this.tourStep = 0;
+    this.updateTourButton();
+    this.runTourStep();
+  }
+
+  private stopTour(): void {
+    if (this.tourTimer !== null) window.clearTimeout(this.tourTimer);
+    this.tourTimer = null;
+    this.tourActive = false;
+    this.updateTourButton();
+  }
+
+  private runTourStep(): void {
+    if (!this.tourActive || this.fallback) return;
+    this.closeDialog();
+    const steps = this.tourSteps();
+    const step = steps[this.tourStep++];
+    if (!step) {
+      this.stopTour();
+      this.setContextPrompt("Tour complete. Explore any section or open the text version.");
+      return;
+    }
+    this.options.onNavigate?.(step.zone);
+    this.setZone(step.zone);
+    this.tourTimer = window.setTimeout(() => {
+      if (!this.tourActive) return;
+      step.open?.();
+      this.tourTimer = window.setTimeout(() => this.runTourStep(), this.tourDelay());
+    }, 900);
+  }
+
+  private tourSteps(): Array<{ zone: string; open?: () => void }> {
+    return [
+      { zone: "plaza" },
+      { zone: "automation-lab", open: () => this.openCapability("automation-engineering") },
+      { zone: "evidence-vault", open: () => this.openProject(this.data.projects[0].id) },
+      { zone: "observatory", open: () => this.openDomain("rims") },
+      { zone: "career-trail", open: () => this.openExperience(this.data.experience[0].id) },
+      { zone: "contact-portal" },
+    ];
+  }
+
+  private tourDelay(): number {
+    const text = (this.overlay?.textContent || this.root.querySelector("[data-context-prompt]")?.textContent || "").trim();
+    return Math.min(4200, Math.max(3000, 2500 + text.length * 4));
+  }
+
+  private updateTourButton(): void {
+    const button = this.root.querySelector<HTMLButtonElement>("[data-tour-toggle]");
+    if (!button) return;
+    button.textContent = this.tourActive ? "Stop tour" : "Start tour";
+    button.setAttribute("aria-pressed", String(this.tourActive));
+    button.setAttribute("aria-label", this.tourActive ? "Stop guided tour" : "Start guided tour");
+  }
 
   private readonly handleFocusIn = (event: FocusEvent): void => {
     if (this.overlay && event.target instanceof Node && !this.overlay.contains(event.target)) {
