@@ -28,7 +28,7 @@ npm.cmd run test:e2e
 - Use the mouse wheel to zoom.
 - Press `E`, `Space`, or `Enter` near a prompt to open details.
 - On mobile, use the on-screen movement pad and direction buttons.
-- Use **Day mode**, **Sound**, **Reduce motion**, **Browse projects**, **Browse experience**, and **Text version** from the UI.
+- Use **Day mode**, **Sound**, **Reduce motion**, **Browse projects**, **Browse experience**, and **Text portfolio** from the UI.
 
 ## What is included
 

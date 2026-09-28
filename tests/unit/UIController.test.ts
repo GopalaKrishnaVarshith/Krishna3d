@@ -220,7 +220,7 @@ describe("UIController", () => {
   it("keeps the selected day theme when switching to the text fallback", () => {
     localStorage.setItem("krishna-world-theme", "day");
     controller = new UIController(root);
-    controller.showFallback("Text version");
+    controller.showFallback("Text portfolio");
     expect(document.documentElement.dataset.theme).toBe("day");
     expect(root.classList.contains("is-fallback")).toBe(true);
   });

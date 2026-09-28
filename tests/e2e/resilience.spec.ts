@@ -48,7 +48,7 @@ test("small viewport controls remain usable and do not overflow", async ({ page 
   await ready(page);
   await expect(page.getByRole("button", { name: "Move forward" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Interact" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Text version" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Text portfolio" })).toBeVisible();
   const viewportFits = await page.evaluate(() =>
     document.documentElement.scrollWidth <= window.innerWidth + 1);
   expect(viewportFits).toBe(true);

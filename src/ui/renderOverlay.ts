@@ -16,7 +16,7 @@ function shell(kicker: string, title: string, body: string, index: number, total
     <div class="detail-panel">
       <div class="detail-topline"><span class="eyebrow">${escapeHtml(kicker)}</span><button class="text-button" type="button" data-close aria-label="Close details">Close <span aria-hidden="true">×</span></button></div>
       <div class="detail-scroll"><p class="detail-counter">${index + 1} / ${total}</p><h2 id="detail-title">${escapeHtml(title)}</h2>${body}</div>
-      <nav class="detail-pagination" aria-label="Detail navigation"><button type="button" data-previous aria-label="Previous item">← Previous</button><button type="button" data-next aria-label="Next item">Next →</button></nav>
+      <nav class="detail-pagination" aria-label="Detail navigation"><button type="button" data-previous aria-label="Previous item">Previous</button><button type="button" data-next aria-label="Next item">Next</button></nav>
     </div>`;
   return dialog;
 }

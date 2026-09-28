@@ -1,6 +1,6 @@
 import {
-  BufferAttribute, CapsuleGeometry, DoubleSide, Group, Mesh,
-  MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, TextureLoader, Vector3,
+  BufferAttribute, CapsuleGeometry, CircleGeometry, DoubleSide, Group, Mesh,
+  MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, TextureLoader, Vector3,
   type Texture,
 } from "three";
 import { AvatarMotion, type AvatarInput, type AvatarPose } from "./AvatarMotion";
@@ -226,6 +226,14 @@ export class Avatar {
       this.orientTo(this.cameraPosition);
     };
     this.group.add(this.visual);
+    const groundShadow = new Mesh(new CircleGeometry(0.46, 32),
+      new MeshBasicMaterial({ color: 0x07131b, transparent: true, opacity: 0.26,
+        depthWrite: false }));
+    groundShadow.name = "soft contact shadow under avatar";
+    groundShadow.rotation.x = -Math.PI / 2;
+    groundShadow.position.set(0, 0.012, 0.02);
+    groundShadow.renderOrder = 0;
+    this.group.add(groundShadow);
 
     // These genuine volumes have depth, follow the logical joints, and cast
     // humanoid shadows. They cannot cover the authored face, garments or gaps.

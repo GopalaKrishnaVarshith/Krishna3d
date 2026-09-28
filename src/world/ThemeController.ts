@@ -116,7 +116,7 @@ export class ThemeController {
     this.transitionSeconds = Math.max(0.01, options.transitionSeconds ?? 0.7);
     let saved: string | null = null;
     try { saved = this.storage?.getItem(THEME_STORAGE_KEY) ?? null; } catch { /* blocked storage */ }
-    this.currentTheme = saved === "day" ? "day" : "night";
+    this.currentTheme = saved === "night" ? "night" : "day";
     this.originalBackground = scene.background;
     this.originalFog = scene.fog;
     this.scene.background = this.sky;

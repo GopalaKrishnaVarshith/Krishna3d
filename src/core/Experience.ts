@@ -225,6 +225,7 @@ export class Experience {
 
   tourFocus(kind: TourFocusKind, id?: string): number {
     if (!this.world || !this.avatar) return 0;
+    this.playNavigationSound();
     if (kind === "profile") return this.focusTourProfile();
     if (kind === "section") return 0;
     if (kind === "capability" && id) return this.focusTourInteractive("automation-lab", `capability:${id}`);
@@ -250,7 +251,7 @@ export class Experience {
     const delay = audio.createDelay(1);
     const feedback = audio.createGain();
     master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(0.04, now + 0.9);
+    master.gain.exponentialRampToValueAtTime(0.028, now + 0.9);
     filter.type = "lowpass";
     filter.frequency.value = 1700;
     delay.delayTime.value = 0.28;
@@ -276,9 +277,9 @@ export class Experience {
     };
     const playStep = () => {
       const at = audio.currentTime + 0.02;
-      playNote(scale[step % scale.length], at, 0.24, 0.07, "triangle");
-      if (step % 4 === 0) playNote(scale[0] / 2, at, 0.36, 0.05, "sine");
-      if (step % 8 === 6) playNote(scale[4] * 2, at, 0.12, 0.025, "sine");
+      playNote(scale[step % scale.length], at, 0.24, 0.045, "triangle");
+      if (step % 4 === 0) playNote(scale[0] / 2, at, 0.36, 0.032, "sine");
+      if (step % 8 === 6) playNote(scale[4] * 2, at, 0.12, 0.018, "sine");
       step += 1;
     };
     playStep();

@@ -37,7 +37,7 @@ test.afterEach(({ page }) => {
 test("loads one rendered world and directly navigates every destination", async ({ page }, testInfo) => {
   await ready(page);
   await expect(page.locator("#experience canvas")).toHaveCount(1);
-  await capture(page, testInfo, "arrival-night");
+  await capture(page, testInfo, "arrival-light");
   for (const name of ["Automation Lab", "Project Portfolio", "Regulatory Observatory",
     "Career Experience", "Contact Portal", "Arrival Plaza"]) {
     await destination(page, name);
@@ -46,18 +46,19 @@ test("loads one rendered world and directly navigates every destination", async 
   }
 });
 
-test("daylight and reduced motion persist after reload", async ({ page }, testInfo) => {
+test("theme, sound, and reduced motion persist after reload", async ({ page }, testInfo) => {
   await ready(page);
-  await page.getByRole("button", { name: /Switch to day theme/ }).click();
-  await page.getByRole("button", { name: "Reduce motion" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
+  await page.getByRole("button", { name: /Switch to night theme/ }).click();
+  await page.getByRole("button", { name: "Reduce motion" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "night");
   await expect(page.locator("html")).toHaveAttribute("data-reduced-motion", "true");
   await page.getByRole("button", { name: "Enable sound" }).click();
   await expect(page.getByRole("button", { name: "Mute sound" })).toHaveAttribute("aria-pressed", "true");
-  await capture(page, testInfo, "arrival-day-reduced");
+  await capture(page, testInfo, "arrival-night-reduced");
   await page.reload();
   await expect(page.locator("[data-loading]")).toHaveCount(0);
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "day");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "night");
   await expect(page.locator("html")).toHaveAttribute("data-reduced-motion", "true");
   await expect(page.getByRole("button", { name: "Mute sound" })).toHaveAttribute("aria-pressed", "true");
 });
@@ -189,7 +190,7 @@ test("contact links and keyboard focus stay available", async ({ page }) => {
 
 test("chosen text version contains all work and links", async ({ page }) => {
   await ready(page);
-  await page.getByRole("button", { name: "Text version" }).click();
+  await page.getByRole("button", { name: "Text portfolio" }).click();
   await expect(page.locator("[data-fallback-project]")).toHaveCount(11);
   await expect(page.locator("[data-fallback-role]")).toHaveCount(8);
   await expect(page.locator("#experience")).toBeHidden();

@@ -49,7 +49,7 @@ describe("ThemeController", () => {
 
   it("transitions one set of world materials and lights between night and day", () => {
     const scene = new Scene();
-    const storage = memoryStorage();
+    const storage = memoryStorage("night");
     const controller = new ThemeController(scene, { storage });
     const material = new MeshStandardMaterial();
     controller.bindMaterial(material, {
@@ -85,7 +85,7 @@ describe("ThemeController", () => {
 
   it("switches theme without animation under reduced motion", () => {
     const scene = new Scene();
-    const controller = new ThemeController(scene, { reducedMotion: true, storage: memoryStorage() });
+    const controller = new ThemeController(scene, { reducedMotion: true, storage: memoryStorage("night") });
     const material = new MeshStandardMaterial();
     controller.bindMaterial(material, {
       night: { color: 0x102030, emissiveIntensity: 1 },
@@ -113,7 +113,7 @@ describe("ThemeController", () => {
     const practical = new PointLight(0xffcc88, 2);
     practical.userData.worldThemeLight = { night: 2, day: 0.1 };
     world.group.add(practical);
-    const controller = new ThemeController(scene, { reducedMotion: true, storage: memoryStorage() });
+    const controller = new ThemeController(scene, { reducedMotion: true, storage: memoryStorage("night") });
     controller.bindWorldTerrain(world.group);
     controller.bindSceneMaterials(world.group);
 

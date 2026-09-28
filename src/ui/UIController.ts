@@ -67,7 +67,7 @@ export class UIController {
 
   constructor(private readonly root: HTMLElement, private readonly options: UIControllerOptions = {}) {
     this.data = options.data || portfolioData;
-    this.theme = saved(THEME_KEY) === "day" ? "day" : "night";
+    this.theme = saved(THEME_KEY) === "night" ? "night" : "day";
     this.reducedMotion = saved(MOTION_KEY) === null
       ? Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)
       : saved(MOTION_KEY) === "true";
@@ -220,9 +220,10 @@ export class UIController {
     this.root.innerHTML = `
       <a class="skip-link" href="#portfolio-navigation">Skip to destinations</a>
       <header class="ui-header"><div class="ui-identity"><span class="ui-monogram" aria-hidden="true">KV</span><div><strong>${escapeHtml(profile.name)}</strong><span data-current-zone>Arrival Plaza</span></div></div><div class="ui-header-actions"><button type="button" data-theme-toggle aria-label="Switch to ${this.theme === "night" ? "day" : "night"} theme">${this.theme === "night" ? "Day" : "Night"} mode</button><button type="button" data-sound-toggle aria-pressed="${this.soundEnabled}" aria-label="${this.soundEnabled ? "Mute" : "Enable"} sound">Sound ${this.soundEnabled ? "on" : "off"}</button><button type="button" data-motion-toggle aria-pressed="${this.reducedMotion}" aria-label="${this.reducedMotion ? "Enable" : "Reduce"} motion">${this.reducedMotion ? "Motion off" : "Reduce motion"}</button></div></header>
+      <section class="ui-value-card" aria-label="Portfolio focus"><h1>Regulatory workflow automation, document quality, and responsible AI systems.</h1><dl class="ui-proof-strip"><div><dt>Projects</dt><dd>11</dd></div><div><dt>Roles</dt><dd>8</dd></div><div><dt>Training</dt><dd>200+</dd></div><div><dt>Focus</dt><dd>Regulated workflows</dd></div></dl></section>
       <nav id="portfolio-navigation" class="ui-navigation" aria-label="Destinations"><span class="eyebrow">Explore the world</span><ol>${DESTINATIONS.map((destination, index) => `<li><button type="button" data-zone-target="${destination.id}" ${index === 0 ? 'aria-current="location"' : ""}><span class="nav-number">${String(index + 1).padStart(2, "0")}</span><span>${escapeHtml(destination.label)}</span></button></li>`).join("")}</ol><div class="ui-browse"><button type="button" data-browse-projects>Browse projects</button><button type="button" data-browse-experience>Browse experience</button></div></nav>
-      <div class="ui-footer"><p class="ui-prompt"><span class="prompt-mark" aria-hidden="true">✦</span><span data-context-prompt>Meet Krishna and choose a path</span></p><div class="ui-quick-links"><a href="mailto:${escapeHtml(profile.email)}">Email</a><a href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span></a><button type="button" data-tour-toggle aria-pressed="false" aria-label="Start guided tour">Start tour</button><button type="button" data-fallback-toggle>Text version</button></div></div>
-      <div class="mobile-controls" role="group" aria-label="Move in the world"><div class="mobile-touch-pad"></div><button type="button" data-move="left" aria-label="Move left">←</button><button type="button" data-move="forward" aria-label="Move forward">↑</button><button type="button" data-move="back" aria-label="Move back">↓</button><button type="button" data-move="right" aria-label="Move right">→</button><button type="button" data-interact aria-label="Interact">✦</button></div>
+      <div class="ui-footer"><p class="ui-prompt"><span class="prompt-mark" aria-hidden="true"></span><span data-context-prompt>Meet Krishna and choose a path</span></p><div class="ui-quick-links"><span class="ui-contact-links"><a href="mailto:${escapeHtml(profile.email)}">Email</a><a href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">LinkedIn</a></span><button type="button" data-tour-toggle aria-pressed="false" aria-label="Start guided tour">Start tour</button><button type="button" data-fallback-toggle>Text portfolio</button></div></div>
+      <div class="mobile-controls" role="group" aria-label="Move in the world"><button type="button" data-move="left" aria-label="Move left"><span aria-hidden="true">L</span></button><button type="button" data-move="forward" aria-label="Move forward"><span aria-hidden="true">F</span></button><button type="button" data-move="back" aria-label="Move back"><span aria-hidden="true">B</span></button><button type="button" data-move="right" aria-label="Move right"><span aria-hidden="true">R</span></button><button type="button" data-interact aria-label="Interact">Open</button></div>
       <div class="loading-screen" data-loading role="status" aria-label="Loading portfolio"><div class="loading-inner"><span class="eyebrow">Entering the world</span><strong>${escapeHtml(profile.name)}</strong><p>Building your view of the work.</p><progress max="100" value="0" aria-label="Loading progress"></progress><span data-loading-number>0%</span></div></div>`;
   }
 
@@ -495,7 +496,7 @@ export class UIController {
       <p>Email Krishna or open LinkedIn to discuss roles, automation, or regulated workflow work.</p>
       <div class="tour-end-actions">
         <a class="tour-end-action tour-end-action-primary" href="mailto:${escapeHtml(profile.email)}">Email for job enquiry</a>
-        <a class="tour-end-action" href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">Open LinkedIn <span aria-hidden="true">↗</span></a>
+        <a class="tour-end-action" href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">Open LinkedIn</a>
       </div>
       <button class="tour-end-close" type="button" data-close hidden aria-label="Close tour complete overlay">Close ×</button>
     </div>`;
@@ -510,7 +511,13 @@ export class UIController {
   private openSectionIntro(zone: string): void {
     const destination = DESTINATIONS.find((item) => item.id === zone);
     if (!destination) return;
-    this.openTopic(destination.label, destination.hint, "Opening the section details next.", []);
+    const dialog = document.createElement("section");
+    dialog.className = "tour-section-overlay";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "tour-section-title");
+    dialog.innerHTML = `<div class="tour-section-card"><button class="sr-close" type="button" data-close aria-label="Close section title"></button><p>Entering</p><h2 id="tour-section-title">${escapeHtml(destination.label)}</h2><span>${escapeHtml(destination.hint)}</span></div>`;
+    this.openDialog(dialog, "topic", 0);
   }
 
   private clearTourEndCloseTimer(): void {

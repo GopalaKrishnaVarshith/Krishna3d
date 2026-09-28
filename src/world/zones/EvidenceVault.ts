@@ -129,6 +129,19 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
       [Math.cos(angle) * 3.68, 0.321, Math.sin(angle) * 3.68],
       0.009, p.brass);
   }
+  const portfolioOrbit = new Group();
+  portfolioOrbit.name = "project portfolio living orbit";
+  kit.group.add(portfolioOrbit);
+  for (let marker = 0; marker < 4; marker += 1) {
+    const angle = marker * Math.PI / 2 + Math.PI / 4;
+    const markerGroup = new Group();
+    markerGroup.position.set(Math.cos(angle) * 2.05, 1.18, Math.sin(angle) * 2.05);
+    portfolioOrbit.add(markerGroup);
+    kit.torus(`portfolio proof orbit marker ${marker + 1}`, 0.18, 0.012,
+      marker % 2 ? p.goldLight : p.tealLight, [0, 0, 0], markerGroup, 18);
+    kit.sphere(`portfolio proof orbit core ${marker + 1}`, 0.045,
+      marker % 2 ? p.goldLight : p.tealLight, [0, 0, 0], markerGroup, 8);
+  }
 
   // Open arched wall and vaulted rib canopy remain transparent in the map view.
   const entranceArc = (angle: number) => Math.abs(Math.atan2(
@@ -265,7 +278,9 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
   const crystal = kit.add("vault inspectable evidence prism",
     kit.own(new OctahedronGeometry(0.46)), crystalMaterial, [0, 1.29, 0], metricMount);
   crystal.rotation.z = 0.2;
-  kit.text("vault archive title", ["EVIDENCE", "VAULT"], 1.18, 0.42,
+  kit.text("portfolio featured work title", ["FEATURED", "WORK"], 0.92, 0.34,
+    [0, 2.08, 0.84], metricMount, { fontSize: 120 }).rotation.y = Math.PI;
+  kit.text("vault archive title", ["PROJECT", "PORTFOLIO"], 1.42, 0.42,
     [-3.32, 2.12, 2.34]).rotation.y = -0.88;
 
   kit.optimizeDrawCalls();
@@ -283,6 +298,8 @@ export function createEvidenceVault(options: EvidenceVaultOptions = {}): Evidenc
       elapsed += delta;
       crystal.rotation.y += delta * 0.18;
       crystal.position.y = 1.29 + Math.sin(elapsed * 1.4) * 0.055;
+      portfolioOrbit.rotation.y += delta * 0.085;
+      portfolioOrbit.position.y = Math.sin(elapsed * 1.1) * 0.035;
     },
     dispose: () => kit.dispose(),
   };
