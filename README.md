@@ -77,7 +77,7 @@ npm.cmd run build
 Set `VITE_SITE_URL` when deploying to a real URL, for example:
 
 ```powershell
-$env:VITE_SITE_URL = "https://gopalakrishnavarshith.github.io/krishna-three-portfolio/"
+$env:VITE_SITE_URL = "https://gopalakrishnavarshith.github.io/Krishna3d/"
 npm.cmd run build
 ```
 

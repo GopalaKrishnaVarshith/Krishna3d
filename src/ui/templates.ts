@@ -12,7 +12,7 @@ export const DESTINATIONS = [
 export type ZoneId = (typeof DESTINATIONS)[number]["id"];
 export type Theme = "night" | "day";
 
-export const DEFAULT_SITE_URL = "https://gopalakrishnavarshith.github.io/krishna-three-portfolio/";
+export const DEFAULT_SITE_URL = "https://gopalakrishnavarshith.github.io/Krishna3d/";
 
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
