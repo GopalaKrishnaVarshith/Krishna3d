@@ -25,8 +25,10 @@ export function renderProjectOverlay(project: Project, index: number, total: num
   const metrics = project.metrics.length
     ? `<dl class="detail-metrics">${project.metrics.map((metric) => `<div><dt>${escapeHtml(metric.label)}</dt><dd>${escapeHtml(metric.value)}</dd></div>`).join("")}</dl>`
     : "";
+  const relevance = [project.category, ...project.skills.slice(0, 2)].join(" | ");
   const body = `<p class="detail-lede">${escapeHtml(project.summary)}</p>${metrics}
-    <div class="detail-sections"><section><h3>Challenge</h3><p>${escapeHtml(project.challenge)}</p></section><section><h3>Response</h3><p>${escapeHtml(project.response)}</p></section><section><h3>Outcome</h3><p>${escapeHtml(project.outcome)}</p></section></div>${tags(project.skills)}`;
+    <div class="detail-sections"><section><h3>Challenge</h3><p>${escapeHtml(project.challenge)}</p></section><section><h3>Response</h3><p>${escapeHtml(project.response)}</p></section><section><h3>Outcome</h3><p>${escapeHtml(project.outcome)}</p></section></div>${tags(project.skills)}
+    <aside class="detail-match"><strong>Relevant for</strong><span>${escapeHtml(relevance)}</span></aside>`;
   return shell(`${project.number} · ${project.category}`, project.title, body, index, total);
 }
 

@@ -143,6 +143,7 @@ describe("UIController", () => {
     expect(onInteract).toHaveBeenCalledOnce();
     controller.openProject(portfolioData.projects[0].id);
     expect(controller.isOverlayOpen).toBe(true);
+    expect(root.querySelector(".detail-match")?.textContent).toContain("Relevant for");
     root.querySelector<HTMLButtonElement>("[data-next]")!.click();
     expect(onProjectSelect).toHaveBeenCalledWith(portfolioData.projects[1].id);
   });
@@ -159,6 +160,7 @@ describe("UIController", () => {
     tour.click();
     expect(tour.hidden).toBe(true);
     expect(root.querySelector<HTMLButtonElement>("[data-tour-stop]")?.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>("[data-tour-progress]")?.textContent).toMatch(/\d+ \/ \d+/);
     expect(root.classList.contains("is-touring")).toBe(true);
     expect(onTourStart).toHaveBeenCalledOnce();
     expect(onTourNavigate).toHaveBeenCalledWith("plaza");
@@ -180,6 +182,7 @@ describe("UIController", () => {
     expect(onTourNavigate).toHaveBeenLastCalledWith("plaza");
     root.querySelector<HTMLButtonElement>("[data-tour-stop]")!.click();
     expect(tour.hidden).toBe(false);
+    expect(root.querySelector<HTMLButtonElement>("[data-tour-full]")?.hidden).toBe(false);
     expect(tour.getAttribute("aria-pressed")).toBe("false");
     expect(root.classList.contains("is-touring")).toBe(false);
     expect(root.querySelector<HTMLElement>(".ui-tour-controls")?.hidden).toBe(true);

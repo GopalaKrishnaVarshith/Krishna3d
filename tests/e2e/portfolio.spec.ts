@@ -115,15 +115,17 @@ test("Lab and Observatory interaction anchors open grounded capability details",
 test("guided tour opens destination details and can be stopped", async ({ page }) => {
   test.setTimeout(90_000);
   await ready(page);
-  await page.getByRole("button", { name: "Start guided tour" }).click();
+  await page.getByRole("button", { name: "Start quick guided tour" }).click();
   await expect(page.getByRole("button", { name: "Pause guided tour" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Restart" })).toBeVisible();
+  await expect(page.locator("[data-tour-progress]")).toContainText("/");
   await expect(page.locator("[data-current-zone]")).toHaveText("Automation Lab", { timeout: 30_000 });
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Workflow analysis & product delivery" }))
     .toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: "Stop" }).click();
-  await expect(page.getByRole("button", { name: "Start guided tour" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start quick guided tour" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start full guided tour" })).toBeVisible();
 });
 
 test("opens the Project Portfolio through world interaction and paginates eleven case studies", async ({ page }, testInfo) => {
@@ -136,6 +138,7 @@ test("opens the Project Portfolio through world interaction and paginates eleven
     await page.keyboard.down("e");
   }
   await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("dialog").getByText("Relevant for")).toBeVisible();
   if (testInfo.project.name !== "mobile-chromium") await page.keyboard.up("e");
   await capture(page, testInfo, "project-overlay");
   await page.getByRole("button", { name: "Close details" }).click();

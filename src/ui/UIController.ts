@@ -10,6 +10,7 @@ const SOUND_KEY = "krishna-world-sound";
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 type MoveDirection = "forward" | "back" | "left" | "right";
 type TourFocusKind = "profile" | "section" | "capability" | "project" | "domain" | "experience" | "contact";
+type TourMode = "quick" | "full";
 
 interface TourStep {
   zone: string;
@@ -60,6 +61,7 @@ export class UIController {
   private tourTimer: number | null = null;
   private tourEndCloseTimer: number | null = null;
   private tourStep = 0;
+  private tourMode: TourMode = "quick";
   private tourActive = false;
   private tourPaused = false;
   private tourZone: string | null = null;
@@ -223,7 +225,7 @@ export class UIController {
       <header class="ui-header"><div class="ui-identity"><span class="ui-monogram" aria-hidden="true">KV</span><div><strong>${escapeHtml(profile.name)}</strong><span data-current-zone>Arrival Plaza</span></div></div><div class="ui-header-actions"><button type="button" data-theme-toggle aria-label="Switch to ${this.theme === "night" ? "day" : "night"} theme">${this.theme === "night" ? "Day" : "Night"} mode</button><button type="button" data-sound-toggle aria-pressed="${this.soundEnabled}" aria-label="${this.soundEnabled ? "Mute" : "Enable"} sound">Sound ${this.soundEnabled ? "on" : "off"}</button><button type="button" data-motion-toggle aria-pressed="${this.reducedMotion}" aria-label="${this.reducedMotion ? "Enable" : "Reduce"} motion">${this.reducedMotion ? "Motion off" : "Reduce motion"}</button></div></header>
       <section class="ui-value-card" aria-label="Portfolio focus"><h1>Regulatory workflow automation, document quality, and responsible AI systems.</h1><dl class="ui-proof-strip"><div><dt>Projects</dt><dd>11</dd></div><div><dt>Roles</dt><dd>8</dd></div><div><dt>Training</dt><dd>200+</dd></div><div><dt>Focus</dt><dd>Regulated workflows</dd></div></dl></section>
       <nav id="portfolio-navigation" class="ui-navigation" aria-label="Destinations"><span class="eyebrow">Explore the world</span><ol>${DESTINATIONS.map((destination, index) => `<li><button type="button" data-zone-target="${destination.id}" ${index === 0 ? 'aria-current="location"' : ""}><span class="nav-number">${String(index + 1).padStart(2, "0")}</span><span>${escapeHtml(destination.label)}</span></button></li>`).join("")}</ol><div class="ui-browse"><button type="button" data-browse-projects>Browse projects</button><button type="button" data-browse-experience>Browse experience</button></div></nav>
-      <div class="ui-footer"><p class="ui-prompt"><span class="prompt-mark" aria-hidden="true"></span><span data-context-prompt>Meet Krishna and choose a path</span></p><div class="ui-quick-links"><span class="ui-contact-links"><a href="mailto:${escapeHtml(profile.email)}">Email</a><a href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">LinkedIn</a></span><button type="button" data-tour-toggle aria-pressed="false" aria-label="Start guided tour">Start tour</button><span class="ui-tour-controls" hidden><button type="button" data-tour-pause aria-pressed="false">Pause</button><button type="button" data-tour-stop>Stop</button><button type="button" data-tour-restart>Restart</button></span><button type="button" data-fallback-toggle>Text portfolio</button></div></div>
+      <div class="ui-footer"><p class="ui-prompt"><span class="prompt-mark" aria-hidden="true"></span><span data-context-prompt>Meet Krishna and choose a path</span></p><div class="ui-quick-links"><span class="ui-contact-links"><a href="mailto:${escapeHtml(profile.email)}">Email</a><a href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener noreferrer">LinkedIn</a></span><button type="button" data-tour-toggle aria-pressed="false" aria-label="Start quick guided tour">Quick tour</button><button type="button" data-tour-full aria-pressed="false" aria-label="Start full guided tour">Full tour</button><span class="ui-tour-controls" hidden><span class="ui-tour-progress" data-tour-progress>0 / 0</span><button type="button" data-tour-pause aria-pressed="false">Pause</button><button type="button" data-tour-stop>Stop</button><button type="button" data-tour-restart>Restart</button></span><span class="ui-sound-cue" data-sound-cue>${this.soundEnabled ? "Audio ready" : "Tap Sound for audio"}</span><button type="button" data-fallback-toggle>Text portfolio</button></div></div>
       <div class="mobile-controls" role="group" aria-label="Move in the world"><button type="button" data-move="left" aria-label="Move left"><span aria-hidden="true">L</span></button><button type="button" data-move="forward" aria-label="Move forward"><span aria-hidden="true">F</span></button><button type="button" data-move="back" aria-label="Move back"><span aria-hidden="true">B</span></button><button type="button" data-move="right" aria-label="Move right"><span aria-hidden="true">R</span></button><button type="button" data-interact aria-label="Interact">Open</button></div>
       <div class="loading-screen" data-loading role="status" aria-label="Loading portfolio"><div class="loading-inner"><span class="eyebrow">Entering the world</span><strong>${escapeHtml(profile.name)}</strong><p>Building your view of the work.</p><progress max="100" value="0" aria-label="Loading progress"></progress><span data-loading-number>0%</span></div></div>`;
   }
@@ -271,7 +273,8 @@ export class UIController {
     if (!(target instanceof Element)) return;
     const button = target.closest<HTMLElement>("button, [data-close]");
     if (!button) return;
-    if (button.hasAttribute("data-tour-toggle")) { this.toggleTour(); return; }
+    if (button.hasAttribute("data-tour-toggle")) { this.toggleTour("quick"); return; }
+    if (button.hasAttribute("data-tour-full")) { this.toggleTour("full"); return; }
     if (button.hasAttribute("data-tour-pause")) { this.toggleTourPause(); return; }
     if (button.hasAttribute("data-tour-stop")) { this.stopTour(); this.closeDialog(); return; }
     if (button.hasAttribute("data-tour-restart")) { this.restartTour(); return; }
@@ -389,15 +392,16 @@ export class UIController {
     for (const direction of directions) this.options.onMove?.(direction, false);
   };
 
-  private toggleTour(): void {
+  private toggleTour(mode: TourMode): void {
     if (this.tourActive) this.stopTour();
-    else this.startTour();
+    else this.startTour(mode);
   }
 
-  private startTour(): void {
+  private startTour(mode: TourMode = "quick"): void {
     if (this.fallback) return;
     this.tourActive = true;
     this.tourPaused = false;
+    this.tourMode = mode;
     this.tourStep = 0;
     this.root.classList.add("is-touring");
     if (!this.soundEnabled) {
@@ -406,6 +410,7 @@ export class UIController {
       this.updateSoundButton();
       this.options.onSoundChange?.(true);
     }
+    this.updateSoundCue("Audio ready. If silent, check tab mute.");
     this.options.onTourStart?.();
     this.updateTourButton();
     this.runTourStep();
@@ -450,6 +455,8 @@ export class UIController {
     if (!this.tourActive || this.tourPaused || this.fallback) return;
     this.closeDialog();
     const steps = this.tourSteps();
+    const currentStep = this.tourStep + 1;
+    this.updateTourProgress(steps.length, currentStep);
     const step = steps[this.tourStep++];
     if (!step) {
       this.finishTour();
@@ -463,6 +470,7 @@ export class UIController {
       const focusMs = step.kind ? this.options.onTourFocus?.(step.kind, step.id) ?? 0 : 0;
       this.tourTimer = window.setTimeout(() => {
         if (!this.tourActive) return;
+        this.updateTourProgress(steps.length, currentStep);
         step.open?.();
         this.tourTimer = window.setTimeout(() => this.runTourStep(),
           step.holdMs ?? (step.open ? this.tourDelay() : 3200));
@@ -476,6 +484,21 @@ export class UIController {
     const section = (zone: string): TourStep => ({
       zone, kind: "section", id: zone, open: () => this.openSectionIntro(zone), holdMs: 2000,
     });
+    const quickProjects = this.data.projects.slice(0, 4);
+    const quickSteps: TourStep[] = [
+      { zone: "plaza", kind: "profile", open: () => this.openProfile(), holdMs: 3600 },
+      section("automation-lab"),
+      ...this.data.skillDomains.slice(0, 3).map((item) => ({ zone: "automation-lab",
+        kind: "capability" as const, id: item.id, open: () => this.openCapability(item.id) })),
+      section("evidence-vault"),
+      ...quickProjects.map((item) => ({ zone: "evidence-vault",
+        kind: "project" as const, id: item.id, open: () => this.openProject(item.id) })),
+      section("career-trail"),
+      ...this.data.experience.slice(0, 2).map((item) => ({ zone: "career-trail",
+        kind: "experience" as const, id: item.id, open: () => this.openExperience(item.id) })),
+      section("contact-portal"),
+    ];
+    if (this.tourMode === "quick") return quickSteps;
     return [
       { zone: "plaza", kind: "profile", open: () => this.openProfile(), holdMs: 4200 },
       section("automation-lab"),
@@ -556,13 +579,16 @@ export class UIController {
 
   private updateTourButton(): void {
     const button = this.root.querySelector<HTMLButtonElement>("[data-tour-toggle]");
+    const fullButton = this.root.querySelector<HTMLButtonElement>("[data-tour-full]");
     const controls = this.root.querySelector<HTMLElement>(".ui-tour-controls");
     const pause = this.root.querySelector<HTMLButtonElement>("[data-tour-pause]");
     if (!button) return;
     button.hidden = this.tourActive;
-    button.textContent = "Start tour";
-    button.setAttribute("aria-pressed", String(this.tourActive));
-    button.setAttribute("aria-label", "Start guided tour");
+    if (fullButton) fullButton.hidden = this.tourActive;
+    button.textContent = "Quick tour";
+    button.setAttribute("aria-pressed", String(this.tourActive && this.tourMode === "quick"));
+    button.setAttribute("aria-label", "Start quick guided tour");
+    if (fullButton) fullButton.setAttribute("aria-pressed", String(this.tourActive && this.tourMode === "full"));
     if (controls) controls.hidden = !this.tourActive;
     if (pause) {
       pause.textContent = this.tourPaused ? "Resume" : "Pause";
@@ -577,6 +603,17 @@ export class UIController {
     button.textContent = this.soundEnabled ? "Sound on" : "Sound off";
     button.setAttribute("aria-pressed", String(this.soundEnabled));
     button.setAttribute("aria-label", this.soundEnabled ? "Mute sound" : "Enable sound");
+    this.updateSoundCue(this.soundEnabled ? "Audio ready" : "Tap Sound for audio");
+  }
+
+  private updateSoundCue(text: string): void {
+    const cue = this.root.querySelector<HTMLElement>("[data-sound-cue]");
+    if (cue) cue.textContent = text;
+  }
+
+  private updateTourProgress(total: number, current: number): void {
+    const progress = this.root.querySelector<HTMLElement>("[data-tour-progress]");
+    if (progress) progress.textContent = `${Math.min(current, total)} / ${total}`;
   }
 
   private readonly handleFocusIn = (event: FocusEvent): void => {
