@@ -5,14 +5,14 @@ Measured on 2026-09-28 with `npm.cmd run build`.
 | Area | Bytes | Notes |
 |---|---:|---|
 | HTML | 3,534 | Includes injected SEO metadata |
-| CSS | 26,304 | Single global interface stylesheet |
+| CSS | 26,318 | Single global interface stylesheet |
 | JavaScript | 755,298 | Split into app, world, avatar, and Three.js vendor chunks |
 | Avatar WebP views | 1,326,310 | 32 optimized views for idle, walk, and interaction poses |
 | Portrait asset | 77,058 | Static fallback/profile image |
 | Company logos | 24,928 | Six optimized WebP marks |
 | Publication cover | 5,712 | Optimized WebP cover |
 | Crawler files and favicon | 626 | `robots.txt`, `sitemap.xml`, `favicon.svg` |
-| Total built files | 2,219,770 | 2.12 MiB, below the 3 MB initial-interactive budget |
+| Total built files | 2,219,784 | 2.12 MiB, below the 3 MB initial-interactive budget |
 
 ## Chunk Budget
 
