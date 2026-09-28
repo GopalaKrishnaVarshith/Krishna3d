@@ -125,6 +125,32 @@ describe("Experience", () => {
     expect(transitionTo).toHaveBeenCalledWith(expect.objectContaining({ position: cameraPoint, fov: 60 }));
   });
 
+
+  it("keeps consecutive project tour stops inside the portfolio island", () => {
+    const { experience } = createExperience();
+    const projectId = "workflow-request-management";
+    const capsule = new Vector3(4, 0, -14);
+    const zone = {
+      id: "evidence-vault",
+      entryPoint: new Vector3(0, 0, -10.58),
+      capsulePositions: new Map([[projectId, capsule]]),
+      cameraPoints: new Map([[projectId, new Vector3(2.12, 2.35, -14)]]),
+    };
+    (experience as unknown as {
+      world: { zones: { get: (id: string) => unknown } };
+      avatar: { group: { position: Vector3 } };
+    }).world = { zones: { get: (id: string) => id === "evidence-vault" ? zone : undefined } };
+    (experience as unknown as { avatar: { group: { position: Vector3 } } }).avatar = {
+      group: { position: new Vector3(-2.5, 0, -13.5) },
+    };
+
+    experience.tourFocus("project", projectId, vi.fn());
+
+    const guidedWalk = (experience as unknown as { guidedWalk: { points: Vector3[] } }).guidedWalk;
+    expect(guidedWalk.points.some((point) => Math.abs(point.x) < 0.001 && Math.abs(point.z) < 0.001)).toBe(false);
+    expect(guidedWalk.points.every((point) => point.z < -6)).toBe(true);
+  });
+
   it("pauses on context loss and resumes after restoration", () => {
     const { renderer, experience } = createExperience();
     const fatal = vi.fn();

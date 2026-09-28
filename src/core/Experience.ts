@@ -519,8 +519,10 @@ export class Experience {
   private routeTo(target: Vector3): Vector3[] {
     if (!this.avatar) return [target.clone()];
     const center = new Vector3(0, 0, 0);
+    const position = this.avatar.group.position;
+    const samePortfolioIsland = position.z < -6 && target.z < -6;
     const points: Vector3[] = [];
-    if (target.distanceTo(center) > 6 && this.avatar.group.position.distanceTo(center) > 1.2)
+    if (!samePortfolioIsland && target.distanceTo(center) > 6 && position.distanceTo(center) > 1.2)
       points.push(center);
     points.push(target.clone());
     return points;
