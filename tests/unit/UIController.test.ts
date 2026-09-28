@@ -160,8 +160,8 @@ describe("UIController", () => {
 
   it("runs and stops the guided tour through existing navigation and dialogs", async () => {
     vi.useFakeTimers();
-    const onTourNavigate = vi.fn(() => 0);
-    const onTourFocus = vi.fn(() => 0);
+    const onTourNavigate = vi.fn((_zone: string, onArrive: () => void) => { onArrive(); return 0; });
+    const onTourFocus = vi.fn((_kind: unknown, _id: unknown, onArrive: () => void) => { onArrive(); return 0; });
     const onTourStart = vi.fn();
     const onTourStop = vi.fn();
     controller = new UIController(root, { onTourStart, onTourNavigate, onTourFocus, onTourStop });
@@ -173,23 +173,23 @@ describe("UIController", () => {
     expect(root.querySelector<HTMLElement>("[data-tour-progress]")?.textContent).toMatch(/\d+ \/ \d+/);
     expect(root.classList.contains("is-touring")).toBe(true);
     expect(onTourStart).toHaveBeenCalledOnce();
-    expect(onTourNavigate).toHaveBeenCalledWith("plaza");
+    expect(onTourNavigate).toHaveBeenCalledWith("plaza", expect.any(Function));
     await vi.advanceTimersByTimeAsync(1);
-    expect(onTourFocus).toHaveBeenCalledWith("profile", undefined);
+    expect(onTourFocus).toHaveBeenCalledWith("profile", undefined, expect.any(Function));
     await vi.advanceTimersByTimeAsync(1);
     expect(root.querySelector('[role="dialog"]')?.textContent).toContain(portfolioData.profile.name);
     await vi.advanceTimersByTimeAsync(4201);
-    expect(onTourNavigate).toHaveBeenCalledWith("automation-lab");
+    expect(onTourNavigate).toHaveBeenCalledWith("automation-lab", expect.any(Function));
     expect(root.querySelector('[role="dialog"]')?.textContent).toContain("Automation Lab");
     expect(root.querySelector<HTMLElement>(".ui-footer")?.hasAttribute("inert")).toBe(false);
     await vi.advanceTimersByTimeAsync(2001);
-    expect(onTourFocus).toHaveBeenCalledWith("capability", portfolioData.skillDomains[0].id);
+    expect(onTourFocus).toHaveBeenCalledWith("capability", portfolioData.skillDomains[0].id, expect.any(Function));
     await vi.advanceTimersByTimeAsync(1);
     expect(root.querySelector('[role="dialog"]')?.textContent).toContain(portfolioData.skillDomains[0].title);
     root.querySelector<HTMLButtonElement>("[data-tour-pause]")!.click();
     expect(root.querySelector<HTMLButtonElement>("[data-tour-pause]")?.textContent).toBe("Resume");
     root.querySelector<HTMLButtonElement>("[data-tour-restart]")!.click();
-    expect(onTourNavigate).toHaveBeenLastCalledWith("plaza");
+    expect(onTourNavigate).toHaveBeenLastCalledWith("plaza", expect.any(Function));
     root.querySelector<HTMLButtonElement>("[data-tour-stop]")!.click();
     expect(tour.hidden).toBe(false);
     expect(tour.getAttribute("aria-pressed")).toBe("false");
@@ -198,9 +198,33 @@ describe("UIController", () => {
     expect(onTourStop).toHaveBeenCalled();
   });
 
+
+  it("waits for avatar arrival before opening the next tour overlay", async () => {
+    vi.useFakeTimers();
+    let arriveAtPlaza: (() => void) | undefined;
+    const onTourNavigate = vi.fn((_zone: string, onArrive: () => void) => { arriveAtPlaza = onArrive; return 900; });
+    const onTourFocus = vi.fn((_kind: unknown, _id: unknown, onArrive: () => void) => { onArrive(); return 0; });
+    controller = new UIController(root, { onTourNavigate, onTourFocus });
+
+    root.querySelector<HTMLButtonElement>("[data-tour-toggle]")!.click();
+
+    expect(onTourNavigate).toHaveBeenCalledWith("plaza", expect.any(Function));
+    expect(onTourFocus).not.toHaveBeenCalled();
+    expect(root.querySelector('[role="dialog"]')).toBeNull();
+
+    arriveAtPlaza?.();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(onTourFocus).toHaveBeenCalledWith("profile", undefined, expect.any(Function));
+    expect(root.querySelector('[role="dialog"]')?.textContent).toContain(portfolioData.profile.name);
+  });
+
   it("finishes the guided tour with email and LinkedIn actions", async () => {
     vi.useFakeTimers();
-    controller = new UIController(root, { onTourNavigate: () => 0, onTourFocus: () => 0 });
+    controller = new UIController(root, {
+      onTourNavigate: (_zone, onArrive) => { onArrive(); return 0; },
+      onTourFocus: (_kind, _id, onArrive) => { onArrive(); return 0; },
+    });
     root.querySelector<HTMLButtonElement>("[data-tour-toggle]")!.click();
     await vi.advanceTimersByTimeAsync(200_000);
     expect(root.querySelector(".tour-end-overlay")?.textContent).toContain("Tour complete");

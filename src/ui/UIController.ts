@@ -24,8 +24,8 @@ export interface UIControllerOptions {
   siteUrl?: string;
   onNavigate?: (zoneId: string) => void;
   onTourStart?: () => void;
-  onTourNavigate?: (zoneId: string) => number;
-  onTourFocus?: (kind: TourFocusKind, id?: string) => number;
+  onTourNavigate?: (zoneId: string, onArrive: () => void) => number;
+  onTourFocus?: (kind: TourFocusKind, id: string | undefined, onArrive: () => void) => number;
   onTourStop?: () => void;
   onThemeChange?: (theme: Theme) => void;
   onReducedMotionChange?: (reduced: boolean) => void;
@@ -479,20 +479,24 @@ export class UIController {
       this.finishTour();
       return;
     }
-    const travelMs = step.zone === this.tourZone ? 0 : this.walkToTourZone(step.zone);
-    this.tourTimer = window.setTimeout(() => {
-      if (!this.tourActive) return;
-      this.tourZone = step.zone;
-      this.setZone(step.zone);
-      const focusMs = step.kind ? this.options.onTourFocus?.(step.kind, step.id) ?? 0 : 0;
-      this.tourTimer = window.setTimeout(() => {
+    this.waitForTourAction(
+      (onArrive) => step.zone === this.tourZone ? (onArrive(), 0) : this.walkToTourZone(step.zone, onArrive),
+      () => {
         if (!this.tourActive) return;
-        this.updateTourProgress(steps.length, currentStep);
-        step.open?.();
-        this.tourTimer = window.setTimeout(() => this.runTourStep(),
-          step.holdMs ?? (step.open ? this.tourDelay() : 3200));
-      }, Math.max(0, focusMs));
-    }, Math.max(0, travelMs));
+        this.tourZone = step.zone;
+        this.setZone(step.zone);
+        this.waitForTourAction(
+          (onArrive) => step.kind ? this.options.onTourFocus?.(step.kind, step.id, onArrive) ?? (onArrive(), 0) : (onArrive(), 0),
+          () => {
+            if (!this.tourActive) return;
+            this.updateTourProgress(steps.length, currentStep);
+            step.open?.();
+            this.tourTimer = window.setTimeout(() => this.runTourStep(),
+              step.holdMs ?? (step.open ? this.tourDelay() : 3200));
+          },
+        );
+      },
+    );
   }
 
   private tourSteps(): TourStep[] {
@@ -519,11 +523,28 @@ export class UIController {
     ];
   }
 
-  private walkToTourZone(zone: string): number {
-    const duration = this.options.onTourNavigate?.(zone);
+  private walkToTourZone(zone: string, onArrive: () => void): number {
+    const duration = this.options.onTourNavigate?.(zone, onArrive);
     if (duration !== undefined) return duration;
     this.options.onNavigate?.(zone);
+    onArrive();
     return 900;
+  }
+
+  private waitForTourAction(start: (onArrive: () => void) => number, onDone: () => void): void {
+    let done = false;
+    let timer: number | null = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (timer !== null) window.clearTimeout(timer);
+      this.tourTimer = null;
+      onDone();
+    };
+    const duration = Math.max(0, start(finish));
+    if (done) return;
+    timer = window.setTimeout(finish, Math.min(30000, Math.max(1200, duration + 2500)));
+    this.tourTimer = timer;
   }
 
   private tourDelay(): number {

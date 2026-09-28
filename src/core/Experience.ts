@@ -56,6 +56,8 @@ type TourFocusKind = "profile" | "section" | "capability" | "project" | "domain"
 interface GuidedWalk {
   points: Vector3[];
   onArrive?: () => void;
+  lastPosition: Vector3;
+  stalledMs: number;
 }
 
 interface TourAudio {
@@ -216,22 +218,26 @@ export class Experience {
     this.ui.openExperience(id);
   }
 
-  tourNavigate(id: string): number {
-    if (!this.world || !this.avatar) return 900;
+  tourNavigate(id: string, onArrive?: () => void): number {
+    if (!this.world || !this.avatar) { onArrive?.(); return 900; }
     const zone = this.world.zones.get(id);
-    if (!zone) return 900;
-    return this.startGuidedWalk(this.routeTo(zone.entryPoint), () => this.activateTourZone(zone));
+    if (!zone) { onArrive?.(); return 900; }
+    return this.startGuidedWalk(this.routeTo(zone.entryPoint), () => {
+      this.activateTourZone(zone);
+      onArrive?.();
+    });
   }
 
-  tourFocus(kind: TourFocusKind, id?: string): number {
-    if (!this.world || !this.avatar) return 0;
+  tourFocus(kind: TourFocusKind, id?: string, onArrive?: () => void): number {
+    if (!this.world || !this.avatar) { onArrive?.(); return 0; }
     this.playNavigationSound();
-    if (kind === "profile") return this.focusTourProfile();
-    if (kind === "section") return 0;
-    if (kind === "capability" && id) return this.focusTourInteractive("automation-lab", `capability:${id}`);
-    if (kind === "domain" && id) return this.focusTourInteractive("observatory", `domain:${id}`);
-    if (kind === "project" && id) return this.focusTourProject(id);
-    if (kind === "experience" && id) return this.focusTourExperience(id);
+    if (kind === "profile") return this.focusTourProfile(onArrive);
+    if (kind === "section") { onArrive?.(); return 0; }
+    if (kind === "capability" && id) return this.focusTourInteractive("automation-lab", `capability:${id}`, onArrive);
+    if (kind === "domain" && id) return this.focusTourInteractive("observatory", `domain:${id}`, onArrive);
+    if (kind === "project" && id) return this.focusTourProject(id, onArrive);
+    if (kind === "experience" && id) return this.focusTourExperience(id, onArrive);
+    onArrive?.();
     return kind === "contact" ? 900 : 500;
   }
 
@@ -446,7 +452,7 @@ export class Experience {
     }
   };
 
-  private focusTourProject(id: string): number {
+  private focusTourProject(id: string, onArrive?: () => void): number {
     const zone = this.world?.zones.get("evidence-vault") as EvidenceVaultZone | undefined;
     const capsule = zone?.capsulePositions.get(id);
     if (!zone || !capsule) return 500;
@@ -463,39 +469,41 @@ export class Experience {
         durationMs: 700,
         fov: 60,
       });
+      onArrive?.();
     });
   }
 
-  private focusTourProfile(): number {
-    return this.startGuidedWalk([new Vector3(-2.15, 0, 2.15)], () => {
-      this.cameraRig?.transitionTo({
-        position: new Vector3(-3.8, 2.5, 6.2),
-        target: new Vector3(-2.55, 1.05, 1.25),
-        durationMs: 650,
-        fov: 46,
-      });
+  private focusTourProfile(onArrive?: () => void): number {
+    this.cameraRig?.transitionTo({
+      position: new Vector3(-3.8, 2.5, 6.2),
+      target: new Vector3(-2.55, 1.05, 1.25),
+      durationMs: 650,
+      fov: 46,
     });
+    onArrive?.();
+    return 0;
   }
 
-  private focusTourInteractive(zoneId: string, targetId: string): number {
+  private focusTourInteractive(zoneId: string, targetId: string, onArrive?: () => void): number {
     const zone = this.world?.zones.get(zoneId);
     const target = zone?.interactiveObjects.find((item) => item.id === targetId);
-    if (!target || !this.avatar) return 500;
+    if (!target || !this.avatar) { onArrive?.(); return 500; }
     const point = new Vector3();
     target.object.getWorldPosition(point);
     point.y = 0;
     const direction = point.clone().sub(this.avatar.group.position).setY(0);
     if (direction.lengthSq() > 0) direction.normalize();
-    return this.startGuidedWalk([point.clone().addScaledVector(direction, -1.05)]);
+    return this.startGuidedWalk([point.clone().addScaledVector(direction, -1.05)], onArrive);
   }
 
-  private focusTourExperience(id: string): number {
+  private focusTourExperience(id: string, onArrive?: () => void): number {
     const trail = this.world?.zones.get("career-trail") as CareerTrailZone | undefined;
     const point = trail?.milestoneViewingPoints.get(id);
     const composition = trail?.milestoneCameras.get(id);
-    if (!point) return 500;
+    if (!point) { onArrive?.(); return 500; }
     return this.startGuidedWalk([point], () => {
       if (composition) this.cameraRig?.transitionTo(composition);
+      onArrive?.();
     });
   }
 
@@ -504,7 +512,7 @@ export class Experience {
     const clean = points.map((point) => point.clone().setY(0))
       .filter((point) => point.distanceToSquared(this.avatar!.group.position) > 0.16);
     if (!clean.length) { onArrive?.(); return 0; }
-    this.guidedWalk = { points: clean, onArrive };
+    this.guidedWalk = { points: clean, onArrive, lastPosition: this.avatar.group.position.clone(), stalledMs: 0 };
     return this.estimateWalkMs(clean);
   }
 
@@ -529,7 +537,7 @@ export class Experience {
     return Math.max(900, Math.ceil(distance / 1.65 * 1000 + 650));
   }
 
-  private guidedInput(): { x: number; z: number } | null {
+  private guidedInput(delta: number): { x: number; z: number } | null {
     if (!this.guidedWalk || !this.avatar) return null;
     const position = this.avatar.group.position;
     while (this.guidedWalk.points.length) {
@@ -537,8 +545,20 @@ export class Experience {
       const dx = target.x - position.x;
       const dz = target.z - position.z;
       const distance = Math.hypot(dx, dz);
-      if (distance > 0.36) return { x: dx / distance, z: dz / distance };
+      if (distance > 0.36) {
+        const moved = position.distanceTo(this.guidedWalk.lastPosition);
+        this.guidedWalk.stalledMs = moved < 0.015 ? this.guidedWalk.stalledMs + delta * 1000 : 0;
+        this.guidedWalk.lastPosition.copy(position);
+        if (this.guidedWalk.stalledMs > 1400 && this.world) {
+          // ponytail: tour-only recovery; replace with navmesh routing if authored paths grow.
+          position.copy(this.world.constrainPosition(target, this.avatar.colliderRadius));
+          this.guidedWalk.stalledMs = 0;
+        }
+        return { x: dx / distance, z: dz / distance };
+      }
       this.guidedWalk.points.shift();
+      this.guidedWalk.stalledMs = 0;
+      this.guidedWalk.lastPosition.copy(position);
     }
     const onArrive = this.guidedWalk.onArrive;
     this.guidedWalk = null;
@@ -556,7 +576,7 @@ export class Experience {
   private updateWorld(delta: number): void {
     if (!this.world || !this.avatar || !this.controls || !this.cameraRig || !this.interaction) return;
     const intent = this.controls.consumeFrame();
-    const guided = this.guidedInput();
+    const guided = this.guidedInput(delta);
     const x = guided?.x ?? intent.moveX + Number(this.mobileMoves.has("right")) - Number(this.mobileMoves.has("left"));
     const z = guided?.z ?? intent.moveZ + Number(this.mobileMoves.has("back")) - Number(this.mobileMoves.has("forward"));
     const magnitude = Math.max(1, Math.hypot(x, z));

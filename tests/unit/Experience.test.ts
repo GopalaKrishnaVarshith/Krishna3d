@@ -112,12 +112,15 @@ describe("Experience", () => {
     (experience as unknown as { vault: { open: (id: string) => unknown } }).vault = { open };
     (experience as unknown as { cameraRig: { transitionTo: (composition: unknown) => void } }).cameraRig = { transitionTo };
 
-    experience.tourFocus("project", projectId);
+    const arrived = vi.fn();
+    experience.tourFocus("project", projectId, arrived);
 
     const guidedWalk = (experience as unknown as { guidedWalk: { points: Vector3[]; onArrive: () => void } }).guidedWalk;
     expect(guidedWalk.points.at(-1)?.distanceTo(entryPoint)).toBeGreaterThan(1);
     expect(guidedWalk.points.at(-1)?.distanceTo(capsule.clone().lerp(new Vector3(0, 0, -14), 0.58))).toBeLessThan(0.001);
+    expect(arrived).not.toHaveBeenCalled();
     guidedWalk.onArrive();
+    expect(arrived).toHaveBeenCalledOnce();
     expect(open).toHaveBeenCalledWith(projectId);
     expect(transitionTo).toHaveBeenCalledWith(expect.objectContaining({ position: cameraPoint, fov: 60 }));
   });

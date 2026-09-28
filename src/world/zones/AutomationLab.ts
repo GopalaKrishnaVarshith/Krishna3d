@@ -275,7 +275,7 @@ export function createAutomationLab(options: AutomationLabOptions = {}): Automat
   kit.optimizeDrawCalls();
   return {
     id: "automation-lab", group: kit.group,
-    entryPoint: new Vector3(-13, 0, 0),
+    entryPoint: new Vector3(-13, 0, 1.95),
     cameraComposition: { position: new Vector3(-13, 7.6, 15.2),
       target: new Vector3(-13, 0.7, 0), durationMs: 1050, fov: 72 },
     workflowComposition: { position: new Vector3(-13, 4, 7.2),
