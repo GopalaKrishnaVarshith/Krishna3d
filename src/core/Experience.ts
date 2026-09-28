@@ -58,6 +58,14 @@ interface GuidedWalk {
   onArrive?: () => void;
 }
 
+interface TourAudio {
+  master: GainNode;
+  delay: DelayNode;
+  feedback: GainNode;
+  filter: BiquadFilterNode;
+  timer: number;
+}
+
 export class Experience {
   readonly renderer: WebGLRenderer;
   readonly scene = new Scene();
@@ -83,7 +91,7 @@ export class Experience {
   private interactHeld = false;
   private soundEnabled = false;
   private audio: AudioContext | null = null;
-  private tourAudio: { gain: GainNode; oscillators: OscillatorNode[] } | null = null;
+  private tourAudio: TourAudio | null = null;
   private fatalHandler: ((reason: string) => void) | null = null;
   private pointerStart: { x: number; y: number } | null = null;
 
@@ -236,21 +244,46 @@ export class Experience {
     const audio = this.ensureAudio();
     if (!audio) return;
     void audio.resume();
-    const gain = audio.createGain();
     const now = audio.currentTime;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.018, now + 1.2);
-    gain.connect(audio.destination);
-    const oscillators = [196, 246.94, 329.63].map((frequency, index) => {
+    const master = audio.createGain();
+    const filter = audio.createBiquadFilter();
+    const delay = audio.createDelay(1);
+    const feedback = audio.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(0.04, now + 0.9);
+    filter.type = "lowpass";
+    filter.frequency.value = 1700;
+    delay.delayTime.value = 0.28;
+    feedback.gain.value = 0.24;
+    master.connect(filter).connect(audio.destination);
+    filter.connect(delay).connect(feedback).connect(delay);
+    delay.connect(audio.destination);
+    let step = 0;
+    const scale = [261.63, 329.63, 392, 493.88, 587.33, 493.88, 392, 329.63];
+    const playNote = (frequency: number, at: number, duration: number, volume: number,
+      type: OscillatorType) => {
       const oscillator = audio.createOscillator();
-      oscillator.type = index === 1 ? "triangle" : "sine";
-      oscillator.frequency.setValueAtTime(frequency, now);
-      oscillator.detune.setValueAtTime(index * 4 - 5, now);
-      oscillator.connect(gain);
-      oscillator.start(now);
-      return oscillator;
-    });
-    this.tourAudio = { gain, oscillators };
+      const noteGain = audio.createGain();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, at);
+      oscillator.detune.setValueAtTime(Math.sin(step) * 5, at);
+      noteGain.gain.setValueAtTime(0.0001, at);
+      noteGain.gain.exponentialRampToValueAtTime(volume, at + 0.025);
+      noteGain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+      oscillator.connect(noteGain).connect(master);
+      oscillator.start(at);
+      oscillator.stop(at + duration + 0.04);
+    };
+    const playStep = () => {
+      const at = audio.currentTime + 0.02;
+      playNote(scale[step % scale.length], at, 0.24, 0.07, "triangle");
+      if (step % 4 === 0) playNote(scale[0] / 2, at, 0.36, 0.05, "sine");
+      if (step % 8 === 6) playNote(scale[4] * 2, at, 0.12, 0.025, "sine");
+      step += 1;
+    };
+    playStep();
+    const timer = window.setInterval(playStep, 420);
+    this.tourAudio = { master, delay, feedback, filter, timer };
   }
 
   setTheme(theme: WorldTheme): void {
@@ -417,17 +450,14 @@ export class Experience {
     const capsule = zone?.capsulePositions.get(id);
     if (!zone || !capsule) return 500;
     const center = new Vector3(0, 0, -14);
-    const direction = capsule.clone().sub(center).setY(0);
-    if (direction.lengthSq() > 0) direction.normalize();
-    const approach = capsule.clone().addScaledVector(direction, -0.95);
-    return this.startGuidedWalk([approach], () => {
+    const target = capsule.clone().lerp(center, 0.42).setY(1.35);
+    return this.startGuidedWalk([zone.entryPoint.clone()], () => {
       this.vault?.open(id);
-      const cameraPoint = zone.cameraPoints.get(id);
-      if (cameraPoint) this.cameraRig?.transitionTo({
-        position: cameraPoint,
-        target: capsule.clone().setY(1.35),
+      this.cameraRig?.transitionTo({
+        position: new Vector3(0, 4.6, -6.7),
+        target,
         durationMs: 700,
-        fov: 52,
+        fov: 60,
       });
     });
   }
@@ -592,16 +622,18 @@ export class Experience {
 
   private stopTourMusic(): void {
     if (!this.tourAudio) return;
-    const { gain, oscillators } = this.tourAudio;
+    const { master, delay, feedback, filter, timer } = this.tourAudio;
+    window.clearInterval(timer);
     const audio = this.audio;
     const now = audio?.currentTime ?? 0;
     try {
-      if (audio) gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-      for (const oscillator of oscillators) oscillator.stop(audio ? now + 0.38 : undefined);
-    } catch { /* Stopping already-stopped oscillators is harmless. */ }
+      if (audio) master.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+    } catch { /* The audio graph may already be closed. */ }
     window.setTimeout(() => {
-      gain.disconnect();
-      for (const oscillator of oscillators) oscillator.disconnect();
+      master.disconnect();
+      delay.disconnect();
+      feedback.disconnect();
+      filter.disconnect();
     }, 450);
     this.tourAudio = null;
   }

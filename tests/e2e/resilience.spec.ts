@@ -37,8 +37,8 @@ test("simulated context loss pauses and restores without replacing the world", a
 test("direct navigation and browse flows work without canvas interaction", async ({ page }) => {
   await ready(page);
   await page.getByRole("navigation", { name: "Destinations" })
-    .getByRole("button", { name: /Evidence Vault/ }).click();
-  await expect(page.locator("[data-current-zone]")).toHaveText("Evidence Vault");
+    .getByRole("button", { name: /Project Portfolio/ }).click();
+  await expect(page.locator("[data-current-zone]")).toHaveText("Project Portfolio");
   await page.getByRole("button", { name: "Browse projects" }).click();
   await expect(page.getByRole("dialog")).toContainText("Document Quality Automation");
 });

@@ -28,7 +28,7 @@ describe("UIController", () => {
     links[2].click();
     expect(onNavigate).toHaveBeenCalledWith("evidence-vault");
     controller.setZone("evidence-vault");
-    expect(root.querySelector("[data-current-zone]")?.textContent).toContain("Evidence Vault");
+    expect(root.querySelector("[data-current-zone]")?.textContent).toContain("Project Portfolio");
     expect(links[2].getAttribute("aria-current")).toBe("location");
   });
 
@@ -158,6 +158,7 @@ describe("UIController", () => {
     tour.click();
     expect(tour.textContent).toBe("Stop tour");
     expect(tour.getAttribute("aria-pressed")).toBe("true");
+    expect(root.classList.contains("is-touring")).toBe(true);
     expect(onTourStart).toHaveBeenCalledOnce();
     expect(onTourNavigate).toHaveBeenCalledWith("plaza");
     await vi.advanceTimersByTimeAsync(1);
@@ -167,6 +168,7 @@ describe("UIController", () => {
     await vi.advanceTimersByTimeAsync(4201);
     expect(onTourNavigate).toHaveBeenCalledWith("automation-lab");
     expect(root.querySelector('[role="dialog"]')?.textContent).toContain("Automation Lab");
+    expect(root.querySelector<HTMLElement>(".ui-footer")?.hasAttribute("inert")).toBe(false);
     await vi.advanceTimersByTimeAsync(2001);
     expect(onTourFocus).toHaveBeenCalledWith("capability", portfolioData.skillDomains[0].id);
     await vi.advanceTimersByTimeAsync(1);
@@ -174,6 +176,7 @@ describe("UIController", () => {
     tour.click();
     expect(tour.textContent).toBe("Start tour");
     expect(tour.getAttribute("aria-pressed")).toBe("false");
+    expect(root.classList.contains("is-touring")).toBe(false);
     expect(onTourStop).toHaveBeenCalled();
   });
 

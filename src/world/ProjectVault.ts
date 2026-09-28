@@ -33,7 +33,7 @@ const CATEGORY_PROFILES: Record<string, Profile> = {
   "Service design": [0.21, 0.31, 1.12, 5],
 };
 
-/** Data binding and active motion for the eleven authored Evidence Vault anchors. */
+/** Data binding and active motion for the eleven authored project portfolio anchors. */
 export class ProjectVault {
   readonly capsules = new Map<string, Object3D>();
   activeProject: Project | null = null;

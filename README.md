@@ -32,7 +32,7 @@ npm.cmd run test:e2e
 
 ## What is included
 
-- Six destinations: Arrival Plaza, Automation Lab, Evidence Vault, Regulatory Observatory, Career Experience, and Contact Portal.
+- Six destinations: Arrival Plaza, Automation Lab, Project Portfolio, Regulatory Observatory, Career Experience, and Contact Portal.
 - Eleven public-safe project case studies and eight career entries.
 - A portrait-informed avatar built from optimized local WebP assets.
 - Semantic HTML overlays for project and career details.

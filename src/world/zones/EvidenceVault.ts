@@ -96,7 +96,7 @@ function symbol(kit: ZoneKit, parent: Group, index: number, p: ReturnType<typeof
 
 /** A walkable radial archive with exactly eleven data-bound project capsules. */
 export function createEvidenceVault(options: EvidenceVaultOptions = {}): EvidenceVaultZone {
-  const kit = new ZoneKit("Evidence Vault architecture", 0, -14);
+  const kit = new ZoneKit("Project Portfolio architecture", 0, -14);
   kit.group.scale.y = 1.18;
   kit.group.position.y = -0.354;
   const p = makePalette(kit);

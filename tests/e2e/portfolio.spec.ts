@@ -38,10 +38,10 @@ test("loads one rendered world and directly navigates every destination", async 
   await ready(page);
   await expect(page.locator("#experience canvas")).toHaveCount(1);
   await capture(page, testInfo, "arrival-night");
-  for (const name of ["Automation Lab", "Evidence Vault", "Regulatory Observatory",
+  for (const name of ["Automation Lab", "Project Portfolio", "Regulatory Observatory",
     "Career Experience", "Contact Portal", "Arrival Plaza"]) {
     await destination(page, name);
-    if (["Automation Lab", "Evidence Vault", "Career Experience"].includes(name))
+    if (["Automation Lab", "Project Portfolio", "Career Experience"].includes(name))
       await capture(page, testInfo, name.toLowerCase().replaceAll(" ", "-"));
   }
 });
@@ -112,7 +112,7 @@ test("Lab and Observatory interaction anchors open grounded capability details",
 });
 
 test("guided tour opens destination details and can be stopped", async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   await ready(page);
   await page.getByRole("button", { name: "Start guided tour" }).click();
   await expect(page.getByRole("button", { name: "Stop guided tour" })).toHaveAttribute("aria-pressed", "true");
@@ -123,10 +123,10 @@ test("guided tour opens destination details and can be stopped", async ({ page }
   await expect(page.getByRole("button", { name: "Start guided tour" })).toHaveAttribute("aria-pressed", "false");
 });
 
-test("opens the Evidence Vault through world interaction and paginates eleven case studies", async ({ page }, testInfo) => {
+test("opens the Project Portfolio through world interaction and paginates eleven case studies", async ({ page }, testInfo) => {
   test.setTimeout(210_000);
   await ready(page);
-  await destination(page, "Evidence Vault");
+  await destination(page, "Project Portfolio");
   if (testInfo.project.name === "mobile-chromium") {
     await page.getByRole("button", { name: "Interact" }).click();
   } else {

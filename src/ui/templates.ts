@@ -3,7 +3,7 @@ import type { PortfolioData } from "../data/types.ts";
 export const DESTINATIONS = [
   { id: "plaza", label: "Arrival Plaza", hint: "Meet Krishna and choose a path" },
   { id: "automation-lab", label: "Automation Lab", hint: "Workflow and engineering" },
-  { id: "evidence-vault", label: "Evidence Vault", hint: "Eleven selected projects" },
+  { id: "evidence-vault", label: "Project Portfolio", hint: "Eleven selected projects" },
   { id: "observatory", label: "Regulatory Observatory", hint: "Regulatory data and quality" },
   { id: "career-trail", label: "Career Experience", hint: "Eight professional roles" },
   { id: "contact-portal", label: "Contact Portal", hint: "Get in touch" },

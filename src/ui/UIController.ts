@@ -254,7 +254,8 @@ export class UIController {
     this.root.append(element);
     if (!this.priorInert.size) {
       for (const child of this.root.children) {
-        if (child instanceof HTMLElement && child !== element) {
+        const keepTourControl = this.tourActive && child instanceof HTMLElement && child.classList.contains("ui-footer");
+        if (child instanceof HTMLElement && child !== element && !keepTourControl) {
           this.priorInert.set(child, child.hasAttribute("inert"));
           child.setAttribute("inert", "");
         }
@@ -392,6 +393,7 @@ export class UIController {
     if (this.fallback) return;
     this.tourActive = true;
     this.tourStep = 0;
+    this.root.classList.add("is-touring");
     if (!this.soundEnabled) {
       this.soundEnabled = true;
       persist(SOUND_KEY, String(this.soundEnabled));
@@ -409,6 +411,7 @@ export class UIController {
     this.tourTimer = null;
     this.tourActive = false;
     this.tourZone = null;
+    this.root.classList.remove("is-touring");
     if (wasActive) this.options.onTourStop?.();
     this.updateTourButton();
   }
@@ -532,6 +535,7 @@ export class UIController {
   }
 
   private readonly handleFocusIn = (event: FocusEvent): void => {
+    if (this.tourActive && event.target instanceof Element && event.target.closest("[data-tour-toggle]")) return;
     if (this.overlay && event.target instanceof Node && !this.overlay.contains(event.target)) {
       this.overlay.querySelector<HTMLElement>(FOCUSABLE)?.focus();
     }
