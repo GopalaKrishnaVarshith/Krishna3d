@@ -155,6 +155,7 @@ describe("UIController", () => {
     const onTourStop = vi.fn();
     controller = new UIController(root, { onTourStart, onTourNavigate, onTourFocus, onTourStop });
     const tour = root.querySelector<HTMLButtonElement>("[data-tour-toggle]")!;
+    expect(root.querySelector<HTMLElement>(".ui-tour-controls")?.hidden).toBe(true);
     tour.click();
     expect(tour.hidden).toBe(true);
     expect(root.querySelector<HTMLButtonElement>("[data-tour-stop]")?.hidden).toBe(false);
@@ -181,6 +182,7 @@ describe("UIController", () => {
     expect(tour.hidden).toBe(false);
     expect(tour.getAttribute("aria-pressed")).toBe("false");
     expect(root.classList.contains("is-touring")).toBe(false);
+    expect(root.querySelector<HTMLElement>(".ui-tour-controls")?.hidden).toBe(true);
     expect(onTourStop).toHaveBeenCalled();
   });
 

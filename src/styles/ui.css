@@ -23,6 +23,7 @@
 .ui-quick-links [data-tour-toggle]::after { animation-delay: .9s; }
 .ui-quick-links [data-tour-toggle][aria-pressed="true"] { background: #fff1a6; }
 .ui-tour-controls { display: inline-flex; flex-wrap: wrap; gap: .45rem; }
+.ui-tour-controls[hidden] { display: none; }
 .ui-tour-controls button { padding: .72rem .92rem; color: var(--panel-text); background: var(--panel-bg); border: 1px solid var(--ui-line); border-radius: 100px; font-size: .78rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .ui-tour-controls [data-tour-stop] { color: #050505; background: #ffd21f; border-color: #111; }
 @keyframes tour-wave {
