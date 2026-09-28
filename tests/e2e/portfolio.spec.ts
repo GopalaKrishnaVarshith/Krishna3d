@@ -116,12 +116,14 @@ test("guided tour opens destination details and can be stopped", async ({ page }
   test.setTimeout(90_000);
   await ready(page);
   await page.getByRole("button", { name: "Start guided tour" }).click();
-  await expect(page.getByRole("button", { name: "Stop guided tour" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Pause guided tour" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Restart" })).toBeVisible();
   await expect(page.locator("[data-current-zone]")).toHaveText("Automation Lab", { timeout: 30_000 });
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Workflow analysis & product delivery" }))
     .toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Stop guided tour" }).click();
-  await expect(page.getByRole("button", { name: "Start guided tour" })).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Stop" }).click();
+  await expect(page.getByRole("button", { name: "Start guided tour" })).toBeVisible();
 });
 
 test("opens the Project Portfolio through world interaction and paginates eleven case studies", async ({ page }, testInfo) => {

@@ -156,8 +156,8 @@ describe("UIController", () => {
     controller = new UIController(root, { onTourStart, onTourNavigate, onTourFocus, onTourStop });
     const tour = root.querySelector<HTMLButtonElement>("[data-tour-toggle]")!;
     tour.click();
-    expect(tour.textContent).toBe("Stop tour");
-    expect(tour.getAttribute("aria-pressed")).toBe("true");
+    expect(tour.hidden).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>("[data-tour-stop]")?.hidden).toBe(false);
     expect(root.classList.contains("is-touring")).toBe(true);
     expect(onTourStart).toHaveBeenCalledOnce();
     expect(onTourNavigate).toHaveBeenCalledWith("plaza");
@@ -173,8 +173,12 @@ describe("UIController", () => {
     expect(onTourFocus).toHaveBeenCalledWith("capability", portfolioData.skillDomains[0].id);
     await vi.advanceTimersByTimeAsync(1);
     expect(root.querySelector('[role="dialog"]')?.textContent).toContain(portfolioData.skillDomains[0].title);
-    tour.click();
-    expect(tour.textContent).toBe("Start tour");
+    root.querySelector<HTMLButtonElement>("[data-tour-pause]")!.click();
+    expect(root.querySelector<HTMLButtonElement>("[data-tour-pause]")?.textContent).toBe("Resume");
+    root.querySelector<HTMLButtonElement>("[data-tour-restart]")!.click();
+    expect(onTourNavigate).toHaveBeenLastCalledWith("plaza");
+    root.querySelector<HTMLButtonElement>("[data-tour-stop]")!.click();
+    expect(tour.hidden).toBe(false);
     expect(tour.getAttribute("aria-pressed")).toBe("false");
     expect(root.classList.contains("is-touring")).toBe(false);
     expect(onTourStop).toHaveBeenCalled();

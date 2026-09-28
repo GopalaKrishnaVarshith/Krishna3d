@@ -22,6 +22,9 @@
 .ui-quick-links [data-tour-toggle]::after { content: ""; position: absolute; inset: -.45rem; z-index: -1; border: 2px solid rgba(255,210,31,.7); border-radius: inherit; animation: tour-wave 1.8s ease-out infinite; }
 .ui-quick-links [data-tour-toggle]::after { animation-delay: .9s; }
 .ui-quick-links [data-tour-toggle][aria-pressed="true"] { background: #fff1a6; }
+.ui-tour-controls { display: inline-flex; flex-wrap: wrap; gap: .45rem; }
+.ui-tour-controls button { padding: .72rem .92rem; color: var(--panel-text); background: var(--panel-bg); border: 1px solid var(--ui-line); border-radius: 100px; font-size: .78rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.ui-tour-controls [data-tour-stop] { color: #050505; background: #ffd21f; border-color: #111; }
 @keyframes tour-wave {
   0% { opacity: .8; transform: scale(.92); }
   100% { opacity: 0; transform: scale(1.34); }
@@ -40,6 +43,7 @@
 .ui-navigation button[aria-current] { color: #fff5de; background: #355a59; }
 .ui-browse { display: grid; gap: .15rem; margin: .55rem .45rem 0; padding-top: .55rem; border-top: 1px solid var(--ui-line); }
 .ui-browse button { font-weight: 650; }
+#ui.is-touring .ui-value-card { display: none; }
 #ui.is-touring .ui-navigation { top: auto; bottom: calc(86px + var(--safe-area-bottom)); width: auto; max-width: calc(100vw - 56px); transform: none; padding: .55rem .75rem; border-radius: 100px; }
 #ui.is-touring .ui-navigation ol,
 #ui.is-touring .ui-navigation .ui-browse { display: none; }
@@ -51,7 +55,8 @@
 .ui-footer { position: absolute; left: calc(28px + var(--safe-area-left)); right: calc(28px + var(--safe-area-right)); bottom: calc(20px + var(--safe-area-bottom)); display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; }
 #ui.is-touring .ui-footer { z-index: calc(var(--z-overlay) + 1); }
 #ui.is-touring .ui-quick-links a,
-#ui.is-touring .ui-quick-links [data-fallback-toggle] { display: none; }
+#ui.is-touring .ui-quick-links [data-fallback-toggle],
+#ui.is-touring .ui-contact-links { display: none; }
 #ui.is-touring .ui-quick-links [data-tour-toggle]::before,
 #ui.is-touring .ui-quick-links [data-tour-toggle]::after { animation: none; opacity: 0; }
 .ui-prompt { display: inline-flex; align-items: center; gap: .55rem; max-width: 20rem; margin: 0; padding: .72rem .9rem; color: var(--ui-text); background: var(--ui-bg); border: 1px solid var(--ui-line); border-radius: 100px; font-size: .75rem; line-height: 1.3; backdrop-filter: blur(18px); }
