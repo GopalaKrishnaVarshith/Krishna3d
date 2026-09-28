@@ -60,6 +60,17 @@ describe("CameraRig", () => {
     expect(Math.abs(relative) <= 39 * Math.PI / 180 + 1e-4 || Math.abs(relative) >= 44 * Math.PI / 180 - 1e-4).toBe(true);
   });
 
+
+  it("exposes the rendered yaw used for camera-relative movement", () => {
+    const camera = new PerspectiveCamera();
+    const rig = new CameraRig(camera, { reducedMotion: true });
+    rig.snapTo(new Vector3());
+    expect(rig.viewYaw).toBeCloseTo(0);
+    rig.orbit(Math.PI / 2, 0);
+    rig.follow(new Vector3(), 1 / 60);
+    expect(rig.viewYaw).toBeCloseTo(Math.PI / 2);
+  });
+
   it("honors terrain minimum and a shorter obstruction distance", () => {
     const camera = new PerspectiveCamera();
     const rig = new CameraRig(camera, { terrainHeight: () => 4, obstructionDistance: () => 2 });

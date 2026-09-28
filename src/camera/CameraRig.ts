@@ -57,6 +57,10 @@ export class CameraRig {
 
   get isTransitioning(): boolean { return this.transition !== null; }
   get target(): Vector3 { return this.lookTarget.clone(); }
+  get viewYaw(): number {
+    const offset = this.camera.position.clone().sub(this.lookTarget);
+    return Math.hypot(offset.x, offset.z) > 1e-6 ? Math.atan2(offset.x, offset.z) : this.yaw;
+  }
 
   setReducedMotion(value: boolean): void {
     this.reducedMotion = value;

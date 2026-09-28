@@ -4,6 +4,7 @@ import {
   PerspectiveCamera,
   Scene,
   Texture,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from "three";
@@ -542,6 +543,11 @@ export class Experience {
     return Math.max(900, Math.ceil(distance / 1.65 * 1000 + 650));
   }
 
+  private cameraRelativeMove(x: number, z: number, yaw: number): Vector2 {
+    if (!Number.isFinite(yaw)) return new Vector2(x, z);
+    return new Vector2(x * Math.cos(yaw) + z * Math.sin(yaw), z * Math.cos(yaw) - x * Math.sin(yaw));
+  }
+
   private guidedInput(delta: number): { x: number; z: number } | null {
     if (!this.guidedWalk || !this.avatar) return null;
     const position = this.avatar.group.position;
@@ -585,8 +591,11 @@ export class Experience {
     if (!this.world || !this.avatar || !this.controls || !this.cameraRig || !this.interaction) return;
     const intent = this.controls.consumeFrame();
     const guided = this.guidedInput(delta);
-    const x = guided?.x ?? intent.moveX + Number(this.mobileMoves.has("right")) - Number(this.mobileMoves.has("left"));
-    const z = guided?.z ?? intent.moveZ + Number(this.mobileMoves.has("back")) - Number(this.mobileMoves.has("forward"));
+    const rawX = intent.moveX + Number(this.mobileMoves.has("right")) - Number(this.mobileMoves.has("left"));
+    const rawZ = intent.moveZ + Number(this.mobileMoves.has("back")) - Number(this.mobileMoves.has("forward"));
+    const manual = this.cameraRelativeMove(rawX, rawZ, this.cameraRig.viewYaw);
+    const x = guided?.x ?? manual.x;
+    const z = guided?.z ?? manual.y;
     const magnitude = Math.max(1, Math.hypot(x, z));
     const activate = this.interactRequested || (intent.interact && !this.interactHeld);
     this.interactHeld = intent.interact;

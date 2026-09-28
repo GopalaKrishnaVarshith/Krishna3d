@@ -166,6 +166,15 @@ describe("Experience", () => {
     expect(points.at(-1)?.distanceTo(target)).toBeLessThan(0.001);
   });
 
+
+  it("rotates manual movement to match the camera view", () => {
+    const { experience } = createExperience();
+    const move = (experience as unknown as { cameraRelativeMove: (x: number, z: number, yaw: number) => { x: number; y: number } })
+      .cameraRelativeMove(0, -1, Math.PI / 2);
+    expect(move.x).toBeCloseTo(-1);
+    expect(move.y).toBeCloseTo(0);
+  });
+
   it("pauses on context loss and resumes after restoration", () => {
     const { renderer, experience } = createExperience();
     const fatal = vi.fn();
