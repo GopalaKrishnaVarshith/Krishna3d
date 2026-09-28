@@ -57,6 +57,7 @@ interface GuidedWalk {
   points: Vector3[];
   onArrive?: () => void;
   lastPosition: Vector3;
+  lastDistance: number;
   stalledMs: number;
 }
 
@@ -512,16 +513,18 @@ export class Experience {
     const clean = points.map((point) => point.clone().setY(0))
       .filter((point) => point.distanceToSquared(this.avatar!.group.position) > 0.16);
     if (!clean.length) { onArrive?.(); return 0; }
-    this.guidedWalk = { points: clean, onArrive, lastPosition: this.avatar.group.position.clone(), stalledMs: 0 };
+    this.guidedWalk = { points: clean, onArrive, lastPosition: this.avatar.group.position.clone(), lastDistance: Infinity, stalledMs: 0 };
     return this.estimateWalkMs(clean);
   }
 
   private routeTo(target: Vector3): Vector3[] {
     if (!this.avatar) return [target.clone()];
     const center = new Vector3(0, 0, 0);
+    const portfolioExit = new Vector3(0, 0, -10.58);
     const position = this.avatar.group.position;
     const samePortfolioIsland = position.z < -6 && target.z < -6;
     const points: Vector3[] = [];
+    if (!samePortfolioIsland && position.z < -6 && target.z >= -6) points.push(portfolioExit);
     if (!samePortfolioIsland && target.distanceTo(center) > 6 && position.distanceTo(center) > 1.2)
       points.push(center);
     points.push(target.clone());
@@ -549,8 +552,10 @@ export class Experience {
       const distance = Math.hypot(dx, dz);
       if (distance > 0.36) {
         const moved = position.distanceTo(this.guidedWalk.lastPosition);
-        this.guidedWalk.stalledMs = moved < 0.015 ? this.guidedWalk.stalledMs + delta * 1000 : 0;
+        const closing = this.guidedWalk.lastDistance - distance;
+        this.guidedWalk.stalledMs = moved < 0.015 || closing < 0.006 ? this.guidedWalk.stalledMs + delta * 1000 : 0;
         this.guidedWalk.lastPosition.copy(position);
+        this.guidedWalk.lastDistance = distance;
         if (this.guidedWalk.stalledMs > 1400 && this.world) {
           // ponytail: tour-only recovery; replace with navmesh routing if authored paths grow.
           position.copy(this.world.constrainPosition(target, this.avatar.colliderRadius));
@@ -560,6 +565,7 @@ export class Experience {
       }
       this.guidedWalk.points.shift();
       this.guidedWalk.stalledMs = 0;
+      this.guidedWalk.lastDistance = Infinity;
       this.guidedWalk.lastPosition.copy(position);
     }
     const onArrive = this.guidedWalk.onArrive;

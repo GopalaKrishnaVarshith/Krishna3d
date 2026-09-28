@@ -151,6 +151,21 @@ describe("Experience", () => {
     expect(guidedWalk.points.every((point) => point.z < -6)).toBe(true);
   });
 
+
+  it("routes out of Project Portfolio through the vault exit before changing islands", () => {
+    const { experience } = createExperience();
+    const target = new Vector3(7.67, 0, 10.28);
+    (experience as unknown as { avatar: { group: { position: Vector3 } } }).avatar = {
+      group: { position: new Vector3(2.2, 0, -13.4) },
+    };
+
+    const points = (experience as unknown as { routeTo: (target: Vector3) => Vector3[] }).routeTo(target);
+
+    expect(points[0].distanceTo(new Vector3(0, 0, -10.58))).toBeLessThan(0.001);
+    expect(points[1].distanceTo(new Vector3(0, 0, 0))).toBeLessThan(0.001);
+    expect(points.at(-1)?.distanceTo(target)).toBeLessThan(0.001);
+  });
+
   it("pauses on context loss and resumes after restoration", () => {
     const { renderer, experience } = createExperience();
     const fatal = vi.fn();
