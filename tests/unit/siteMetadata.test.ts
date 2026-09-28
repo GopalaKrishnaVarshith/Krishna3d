@@ -6,8 +6,8 @@ const fixture = '<link rel="canonical" href="__SITE_URL__"><meta property="og:ur
 describe("production site metadata", () => {
   it("uses the agreed GitHub Pages project URL by default", () => {
     const metadata = createSiteMetadata();
-    expect(metadata.url).toBe("https://gopalakrishnavarshith.github.io/krishna-three-portfolio/");
-    expect(metadata.basePath).toBe("/krishna-three-portfolio/");
+    expect(metadata.url).toBe("https://gopalakrishnavarshith.github.io/Krishna3d/");
+    expect(metadata.basePath).toBe("/Krishna3d/");
     expect(metadata.robots).toContain(`${metadata.url}sitemap.xml`);
     expect(metadata.sitemap).toContain(`<loc>${metadata.url}</loc>`);
     expect(injectSiteMetadata(fixture, metadata)).toContain(`href="${metadata.url}"`);

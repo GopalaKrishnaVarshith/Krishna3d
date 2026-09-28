@@ -6,13 +6,13 @@ Measured on 2026-09-28 with `npm.cmd run build`.
 |---|---:|---|
 | HTML | 3,310 | Includes injected SEO metadata |
 | CSS | 26,318 | Single global interface stylesheet |
-| JavaScript | 755,836 | Split into app, world, avatar, and Three.js vendor chunks |
+| JavaScript | 755,905 | Split into app, world, avatar, and Three.js vendor chunks |
 | Avatar WebP views | 1,326,310 | 32 optimized views for idle, walk, and interaction poses |
 | Portrait asset | 77,058 | Static fallback/profile image |
 | Company logos | 24,928 | Six optimized WebP marks |
 | Publication cover | 5,712 | Optimized WebP cover |
 | Crawler files and favicon | 626 | `robots.txt`, `sitemap.xml`, `favicon.svg` |
-| Total built files | 2,220,070 | 2.12 MiB, below the 3 MB initial-interactive budget |
+| Total built files | 2,220,139 | 2.12 MiB, below the 3 MB initial-interactive budget |
 
 ## Chunk Budget
 
@@ -21,8 +21,8 @@ The build intentionally isolates the Three.js runtime into its own vendor chunk:
 | Chunk | Bytes | Gzip |
 |---|---:|---:|
 | `three-*.js` | 592,767 | 148,475 |
-| `world-*.js` | 87,888 | 30,364 |
-| `index-*.js` | 64,183 | 17,846 |
+| `world-*.js` | 90,723 | 31,440 |
+| `index-*.js` | 61,417 | 16,822 |
 | `avatar-*.js` | 10,998 | 3,883 |
 
 The configured Vite warning limit is 650 KB because the only large chunk is the measured Three.js vendor runtime. Application-owned chunks remain well below 100 KB minified.

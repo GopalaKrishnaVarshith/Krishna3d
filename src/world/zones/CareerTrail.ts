@@ -1,5 +1,6 @@
 import { BufferGeometry, CatmullRomCurve3, Float32BufferAttribute, Group, Vector3 } from "three";
 import { portfolioData } from "../../data/portfolioData";
+import { assetUrl } from "../../ui/templates";
 import type { CameraComposition, InteractiveTarget } from "../types";
 import { makePalette, type DynamicWorldZone, type ZoneOptions, ZoneKit } from "./zoneKit";
 
@@ -141,7 +142,7 @@ export function createCareerTrail(options: CareerTrailOptions = {}): CareerTrail
         { background: "#17394b", foreground: "#f5f3e9", accent: "#c8a665", fontSize: 86 });
       kit.bevel(`${role.company} ${sideName} authentic mark mount`, [0.94, 0.38, 0.06],
         p.pale, [0, 1.2, 0.02], face, 0.025);
-      if (role.logo) kit.image(`${role.company} ${sideName} identity mark`, role.logo,
+      if (role.logo) kit.image(`${role.company} ${sideName} identity mark`, assetUrl(role.logo),
         0.8, 0.29, [0, 1.2, 0.057], face);
       else kit.text(`${role.company} ${sideName} exact-name mark`, [role.company.toUpperCase()],
         0.86, 0.3, [0, 1.2, 0.057], face,
