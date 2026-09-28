@@ -451,11 +451,14 @@ export class Experience {
     const capsule = zone?.capsulePositions.get(id);
     if (!zone || !capsule) return 500;
     const center = new Vector3(0, 0, -14);
+    const standPoint = capsule.clone().lerp(center, 0.58).setY(0);
     const target = capsule.clone().lerp(center, 0.42).setY(1.35);
-    return this.startGuidedWalk([zone.entryPoint.clone()], () => {
+    const cameraPoint = zone.cameraPoints.get(id)?.clone() ?? new Vector3(0, 4.6, -6.7);
+    cameraPoint.y = Math.max(cameraPoint.y, 2.35);
+    return this.startGuidedWalk(this.routeTo(standPoint), () => {
       this.vault?.open(id);
       this.cameraRig?.transitionTo({
-        position: new Vector3(0, 4.6, -6.7),
+        position: cameraPoint,
         target,
         durationMs: 700,
         fov: 60,

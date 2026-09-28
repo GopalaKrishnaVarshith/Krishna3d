@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BoxGeometry, Mesh, MeshBasicMaterial, Texture, TextureLoader, WebGLRenderer } from "three";
+import { BoxGeometry, Mesh, MeshBasicMaterial, Texture, TextureLoader, Vector3, WebGLRenderer } from "three";
 import { Experience } from "../../src/core/Experience";
 
 function createExperience() {
@@ -83,6 +83,43 @@ describe("Experience", () => {
     experience.dispose();
 
     expect(textureDispose).toHaveBeenCalledTimes(1);
+  });
+
+
+  it("walks the guided project tour toward the selected portfolio capsule", () => {
+    const { experience } = createExperience();
+    const projectId = "workflow-request-management";
+    const entryPoint = new Vector3(0, 0, -10.58);
+    const capsule = new Vector3(4, 0, -14);
+    const cameraPoint = new Vector3(2.12, 2.35, -14);
+    const zone = {
+      id: "evidence-vault",
+      entryPoint,
+      capsulePositions: new Map([[projectId, capsule]]),
+      cameraPoints: new Map([[projectId, cameraPoint]]),
+    };
+    (experience as unknown as {
+      world: { zones: { get: (id: string) => unknown } };
+      avatar: { group: { position: Vector3 } };
+      vault: { open: (id: string) => unknown };
+      cameraRig: { transitionTo: (composition: unknown) => void };
+    }).world = { zones: { get: (id: string) => id === "evidence-vault" ? zone : undefined } };
+    (experience as unknown as { avatar: { group: { position: Vector3 } } }).avatar = {
+      group: { position: new Vector3(-13, 0, 0) },
+    };
+    const open = vi.fn();
+    const transitionTo = vi.fn();
+    (experience as unknown as { vault: { open: (id: string) => unknown } }).vault = { open };
+    (experience as unknown as { cameraRig: { transitionTo: (composition: unknown) => void } }).cameraRig = { transitionTo };
+
+    experience.tourFocus("project", projectId);
+
+    const guidedWalk = (experience as unknown as { guidedWalk: { points: Vector3[]; onArrive: () => void } }).guidedWalk;
+    expect(guidedWalk.points.at(-1)?.distanceTo(entryPoint)).toBeGreaterThan(1);
+    expect(guidedWalk.points.at(-1)?.distanceTo(capsule.clone().lerp(new Vector3(0, 0, -14), 0.58))).toBeLessThan(0.001);
+    guidedWalk.onArrive();
+    expect(open).toHaveBeenCalledWith(projectId);
+    expect(transitionTo).toHaveBeenCalledWith(expect.objectContaining({ position: cameraPoint, fov: 60 }));
   });
 
   it("pauses on context loss and resumes after restoration", () => {
