@@ -81,9 +81,10 @@ function shadowPart(parent: Group, name: string, radius: number, length: number,
 
 function loadViews(prefix: string): Record<ViewName, Texture> {
   const loader = new TextureLoader();
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const result = {} as Record<ViewName, Texture>;
   for (const name of NAMES) {
-    const texture = loader.load(`/assets/avatar/${prefix}${name}.webp`);
+    const texture = loader.load(`${base}/assets/avatar/${prefix}${name}.webp`);
     texture.colorSpace = SRGBColorSpace;
     texture.anisotropy = 8;
     result[name] = texture;
