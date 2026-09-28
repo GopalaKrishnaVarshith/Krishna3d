@@ -13,8 +13,10 @@ async function ready(page: Page): Promise<void> {
 }
 
 async function destination(page: Page, name: string): Promise<void> {
-  await page.getByRole("navigation", { name: "Destinations" })
-    .getByRole("button", { name: new RegExp(name) }).click();
+  const navigation = page.getByRole("navigation", { name: "Destinations" });
+  const destinationButton = navigation.getByRole("button", { name: new RegExp(name) });
+  if (!(await destinationButton.isVisible())) await navigation.getByRole("button", { name: "Explore the world" }).click();
+  await destinationButton.click();
   await expect(page.locator("[data-current-zone]")).toHaveText(name);
 }
 
@@ -115,7 +117,7 @@ test("Lab and Observatory interaction anchors open grounded capability details",
 test("guided tour opens destination details and can be stopped", async ({ page }) => {
   test.setTimeout(90_000);
   await ready(page);
-  await page.getByRole("button", { name: "Start quick guided tour" }).click();
+  await page.getByRole("button", { name: "Start guided tour" }).click();
   await expect(page.getByRole("button", { name: "Pause guided tour" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Restart" })).toBeVisible();
@@ -124,8 +126,7 @@ test("guided tour opens destination details and can be stopped", async ({ page }
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Workflow analysis & product delivery" }))
     .toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: "Stop" }).click();
-  await expect(page.getByRole("button", { name: "Start quick guided tour" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start full guided tour" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start guided tour" })).toBeVisible();
 });
 
 test("opens the Project Portfolio through world interaction and paginates eleven case studies", async ({ page }, testInfo) => {

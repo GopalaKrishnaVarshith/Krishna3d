@@ -32,14 +32,19 @@ describe("UIController", () => {
     expect(links[2].getAttribute("aria-current")).toBe("location");
   });
 
-  it("updates accessible loading progress and dismisses it at completion", () => {
+  it("updates loading progress, dismisses it, and hides the hero message after ten seconds", async () => {
+    vi.useFakeTimers();
     controller = new UIController(root);
+    expect(root.classList.contains("is-navigation-minimized")).toBe(true);
     controller.setLoading(0.42);
     const progress = root.querySelector<HTMLProgressElement>("progress");
     expect(progress?.value).toBe(42);
     expect(root.querySelector("[data-loading]")?.textContent).toContain("42%");
     controller.setLoading(1);
     expect(root.querySelector("[data-loading]")).toBeNull();
+    expect(root.classList.contains("has-hidden-value-card")).toBe(false);
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(root.classList.contains("has-hidden-value-card")).toBe(true);
   });
 
   it("opens one labelled dialog, traps focus, closes on Escape, and restores focus and scroll", () => {
@@ -182,7 +187,6 @@ describe("UIController", () => {
     expect(onTourNavigate).toHaveBeenLastCalledWith("plaza");
     root.querySelector<HTMLButtonElement>("[data-tour-stop]")!.click();
     expect(tour.hidden).toBe(false);
-    expect(root.querySelector<HTMLButtonElement>("[data-tour-full]")?.hidden).toBe(false);
     expect(tour.getAttribute("aria-pressed")).toBe("false");
     expect(root.classList.contains("is-touring")).toBe(false);
     expect(root.querySelector<HTMLElement>(".ui-tour-controls")?.hidden).toBe(true);
