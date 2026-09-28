@@ -31,6 +31,20 @@ body {
   overscroll-behavior: none;
 }
 
+::selection {
+  color: #081b26;
+  background: #e9c27b;
+}
+
+* {
+  scrollbar-color: #c5a25a rgba(7, 23, 32, .18);
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar { width: .7rem; height: .7rem; }
+::-webkit-scrollbar-track { background: rgba(7, 23, 32, .14); }
+::-webkit-scrollbar-thumb { background: #c5a25a; border: 2px solid transparent; border-radius: 999px; background-clip: content-box; }
+
 html.fallback-active,
 html.fallback-active body,
 html.fallback-active #app {

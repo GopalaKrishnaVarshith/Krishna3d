@@ -36,6 +36,11 @@ describe("UIController", () => {
     vi.useFakeTimers();
     controller = new UIController(root);
     expect(root.classList.contains("is-navigation-minimized")).toBe(true);
+    root.querySelector<HTMLButtonElement>("[data-nav-toggle]")!.click();
+    expect(root.classList.contains("is-navigation-minimized")).toBe(false);
+    expect(root.querySelector<HTMLButtonElement>("[data-nav-toggle]")?.getAttribute("aria-expanded")).toBe("true");
+    root.querySelector<HTMLButtonElement>("[data-nav-toggle]")!.click();
+    expect(root.classList.contains("is-navigation-minimized")).toBe(true);
     controller.setLoading(0.42);
     const progress = root.querySelector<HTMLProgressElement>("progress");
     expect(progress?.value).toBe(42);
